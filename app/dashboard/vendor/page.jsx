@@ -11,7 +11,7 @@ import {
   Loader2, AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { logout } from "@/lib/auth";
+import { logout, resolveUserRole } from "@/lib/auth";
 
 const integrations = [
   { name: "Shopify", bg: "#96bf48", desc: "Sync your Shopify product catalog automatically", connected: false },
@@ -72,8 +72,8 @@ export default function VendorDashboard() {
       if (!user) { router.replace("/login"); return; }
 
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      const role = profile?.role || user.user_metadata?.role;
-      if (role !== "vendor") { router.replace("/dashboard"); return; }
+      const role = resolveUserRole(user, profile?.role);
+      if (role !== "vendor" && role !== "admin") { router.replace("/dashboard"); return; }
 
       setUser(user);
       setLoading(false);

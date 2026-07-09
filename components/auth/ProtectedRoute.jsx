@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolveUserRole } from "@/lib/auth";
 
 export default function ProtectedRoute({
   children,
@@ -29,7 +30,7 @@ export default function ProtectedRoute({
         .eq("id", user.id)
         .single();
 
-      const role = profile?.role || user.user_metadata?.role;
+      const role = resolveUserRole(user, profile?.role);
 
       if (
         allowedRoles.length > 0 &&

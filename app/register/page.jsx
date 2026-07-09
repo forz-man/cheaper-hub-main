@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";
 import AuthCard from "@/components/auth/AuthCard";
@@ -12,7 +12,13 @@ import { register } from "@/lib/auth";
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get("role") || "buyer";
+  const role = searchParams.get("role");
+
+  // No role chosen yet (e.g. someone landed on /register directly) —
+  // send them to pick one instead of silently defaulting to "buyer".
+  useEffect(() => {
+    if (!role) router.replace("/select-role");
+  }, [role, router]);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,6 +30,8 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
 
   const roleLabel = useMemo(() => (role === "vendor" ? "Seller" : "Buyer"), [role]);
+
+  if (!role) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

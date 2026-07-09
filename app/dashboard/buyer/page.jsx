@@ -10,7 +10,7 @@ import {
   Search, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { logout } from "@/lib/auth";
+import { logout, resolveUserRole } from "@/lib/auth";
 
 const mockWishlist = [
   { id: "5", name: "Standing Desk Pro", seller: "WorkSpace Co.", price: 249.99, was: 349.99, rating: 4.7, reviews: 203 },
@@ -61,7 +61,7 @@ export default function BuyerDashboard() {
       if (!user) { router.replace("/login"); return; }
 
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      const role = profile?.role || user.user_metadata?.role;
+      const role = resolveUserRole(user, profile?.role);
       if (role !== "buyer") { router.replace("/dashboard"); return; }
 
       setUser(user);

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { resolveUserRole, destinationForRole } from "@/lib/auth";
 
 export async function GET(request) {
   const requestUrl = new URL(request.url);
@@ -66,21 +67,18 @@ export async function GET(request) {
     return NextResponse.redirect(new URL("/login", origin));
   }
 
-  const role = user.user_metadata?.role || user.app_metadata?.role;
+  let role = resolveUserRole(user, null);
 
-  if (role === "vendor") return NextResponse.redirect(new URL("/dashboard/vendor", origin));
-  if (role === "buyer") return NextResponse.redirect(new URL("/dashboard/buyer", origin));
+  if (!role) {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      role = resolveUserRole(user, profile?.role);
+    } catch {}
+  }
 
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role === "vendor") return NextResponse.redirect(new URL("/dashboard/vendor", origin));
-    if (profile?.role === "buyer") return NextResponse.redirect(new URL("/dashboard/buyer", origin));
-  } catch {}
-
-  return NextResponse.redirect(new URL("/select-role?from=oauth", origin));
+  return NextResponse.redirect(new URL(destinationForRole(role), origin));
 }

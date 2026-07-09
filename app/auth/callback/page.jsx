@@ -3,13 +3,12 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolveUserRole, destinationForRole } from "@/lib/auth";
 
 async function resolveDestination(session) {
   if (!session?.user) return "/login";
 
-  const role =
-    session.user.user_metadata?.role ||
-    session.user.app_metadata?.role;
+  let role = resolveUserRole(session.user, null);
 
   if (!role) {
     try {
@@ -18,15 +17,11 @@ async function resolveDestination(session) {
         .select("role")
         .eq("id", session.user.id)
         .single();
-      if (profile?.role === "vendor") return "/dashboard/vendor";
-      if (profile?.role === "buyer") return "/dashboard/buyer";
+      role = resolveUserRole(session.user, profile?.role);
     } catch {}
-    return "/select-role?from=oauth";
   }
 
-  if (role === "vendor") return "/dashboard/vendor";
-  if (role === "buyer") return "/dashboard/buyer";
-  return "/select-role?from=oauth";
+  return destinationForRole(role);
 }
 
 function CallbackHandler() {
