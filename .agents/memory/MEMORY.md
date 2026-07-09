@@ -1,0 +1,1 @@
+- [Marketplace Stripe checkout](marketplace-stripe-checkout.md) — ad-hoc price_data Checkout Sessions instead of stripe-replit-sync, since Supabase (not Stripe) is the product catalog source of truth.

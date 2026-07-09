@@ -252,7 +252,7 @@ export default function CheckoutPage() {
                 <CreditCard size={15} className="text-[#888]" /> Payment
               </h2>
               <p className="text-sm text-[#888]">
-                You'll enter your card details on Stripe's secure checkout page after clicking "Continue to payment" below.
+                You&rsquo;ll enter your card details on Stripe&rsquo;s secure checkout page after clicking &ldquo;Continue to payment&rdquo; below.
               </p>
               <p className="text-[10px] text-[#bbb] mt-3 flex items-center gap-1">
                 <Shield size={10} /> Payments processed securely by Stripe. Card data never touches our servers.

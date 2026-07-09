@@ -21,7 +21,45 @@ export async function POST(req) {
       return NextResponse.json({ error: "Please sign in to check out." }, { status: 401 });
     }
 
-    const subtotal = items.reduce((sum, i) => sum + Number(i.price) * Number(i.qty), 0);
+    // Never trust client-supplied prices/names. Re-fetch each product from
+    // Supabase and price the order server-side.
+    const productIds = [...new Set(items.map((i) => String(i.id)))];
+    const { data: products, error: productsErr } = await supabase
+      .from("products")
+      .select("id, name, price, vendor_id, vendor_name, status, stock")
+      .in("id", productIds);
+
+    if (productsErr) throw productsErr;
+
+    const productMap = new Map(products.map((p) => [String(p.id), p]));
+    const resolvedItems = [];
+
+    for (const requested of items) {
+      const product = productMap.get(String(requested.id));
+      const qty = Math.max(1, Math.floor(Number(requested.qty) || 0));
+
+      if (!product) {
+        return NextResponse.json({ error: `Product ${requested.id} is no longer available.` }, { status: 400 });
+      }
+      if (product.status !== "active") {
+        return NextResponse.json({ error: `${product.name} is no longer available.` }, { status: 400 });
+      }
+      if (qty < 1 || qty > product.stock) {
+        return NextResponse.json({ error: `Not enough stock for ${product.name}.` }, { status: 400 });
+      }
+
+      resolvedItems.push({
+        id: product.id,
+        name: product.name,
+        price: Number(product.price),
+        qty,
+        vendor_id: product.vendor_id,
+        vendor_name: product.vendor_name,
+      });
+    }
+
+    const items_ = resolvedItems;
+    const subtotal = items_.reduce((sum, i) => sum + i.price * i.qty, 0);
     const shippingFee = subtotal >= 50 ? 0 : 4.99;
     const tax = +(subtotal * 0.08).toFixed(2);
     const grandTotal = +(subtotal + shippingFee + tax).toFixed(2);
@@ -47,7 +85,7 @@ export async function POST(req) {
     if (orderErr) throw orderErr;
     const orderId = order.id;
 
-    const itemsPayload = items.map((item) => ({
+    const itemsPayload = items_.map((item) => ({
       order_id: orderId,
       product_id: String(item.id),
       product_name: item.name,
@@ -64,7 +102,7 @@ export async function POST(req) {
     const stripe = await getUncachableStripeClient();
     const origin = req.headers.get("origin") || `https://${req.headers.get("host")}`;
 
-    const line_items = items.map((item) => ({
+    const line_items = items_.map((item) => ({
       quantity: item.qty,
       price_data: {
         currency: "usd",

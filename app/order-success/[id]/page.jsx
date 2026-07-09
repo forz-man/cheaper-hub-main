@@ -14,13 +14,11 @@ function OrderSuccessContent({ id }) {
 
   const [order, setOrder] = useState(null);
   const [paid, setPaid] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(!!sessionId);
+  const [error, setError] = useState(sessionId ? null : "Missing payment session.");
 
   useEffect(() => {
     if (!sessionId) {
-      setError("Missing payment session.");
-      setLoading(false);
       return;
     }
     fetch(`/api/checkout/verify?session_id=${sessionId}&order_id=${id}`)
@@ -135,7 +133,7 @@ function OrderSuccessContent({ id }) {
           </div>
 
           <p className="text-xs text-[#aaa] mb-6">
-            You'll receive an email at confirmation when your order ships.
+            You&rsquo;ll receive an email at confirmation when your order ships.
           </p>
 
           <div className="flex flex-col gap-3">
