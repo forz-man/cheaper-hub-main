@@ -1,17 +1,69 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, Package, ArrowRight, ShoppingBag } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, ShoppingBag, Loader2, AlertTriangle } from "lucide-react";
 import { Suspense } from "react";
+import { useCart } from "@/lib/cart-context";
 
 function OrderSuccessContent({ id }) {
   const searchParams = useSearchParams();
-  const total = searchParams.get("total") || "0.00";
-  const name = searchParams.get("name") || "there";
-  const itemCount = searchParams.get("items") || "1";
-  const isGuest = id?.startsWith("guest-");
+  const sessionId = searchParams.get("session_id");
+  const { clearCart } = useCart();
+
+  const [order, setOrder] = useState(null);
+  const [paid, setPaid] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setError("Missing payment session.");
+      setLoading(false);
+      return;
+    }
+    fetch(`/api/checkout/verify?session_id=${sessionId}&order_id=${id}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Could not verify payment.");
+        setOrder(data.order);
+        setPaid(data.paid);
+        if (data.paid) clearCart();
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, id]);
+
+  const total = order?.total ?? 0;
+  const name = order?.buyer_name || "there";
+  const itemCount = order?.order_items?.reduce((sum, i) => sum + i.qty, 0) || 0;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+        <Loader2 size={24} className="animate-spin text-[#ccc]" />
+      </div>
+    );
+  }
+
+  if (error || !paid) {
+    return (
+      <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+        <div className="text-center max-w-sm">
+          <AlertTriangle size={36} className="text-amber-500 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-[#111] mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+            {error ? "Couldn't confirm payment" : "Payment not completed"}
+          </h1>
+          <p className="text-sm text-[#888] mb-6">{error || "This order hasn't been paid for yet. If you completed checkout, refresh this page in a moment."}</p>
+          <Link href="/checkout" className="bg-[#111] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#333] transition-colors">
+            Back to checkout
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
@@ -41,15 +93,13 @@ function OrderSuccessContent({ id }) {
           </p>
 
           <div className="bg-[#f9f8f6] border border-[#e2ddd6] rounded-xl p-5 mb-6 text-left space-y-3">
-            {!isGuest && (
-              <div className="flex justify-between text-sm">
-                <span className="text-[#888]">Order ID</span>
-                <span className="font-mono text-xs text-[#555] font-semibold">{id?.slice(0, 8).toUpperCase()}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-[#888]">Order ID</span>
+              <span className="font-mono text-xs text-[#555] font-semibold">{id?.slice(0, 8).toUpperCase()}</span>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#888]">Items</span>
-              <span className="font-semibold text-[#111]">{itemCount} {parseInt(itemCount) === 1 ? "item" : "items"}</span>
+              <span className="font-semibold text-[#111]">{itemCount} {itemCount === 1 ? "item" : "items"}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#888]">Total charged</span>

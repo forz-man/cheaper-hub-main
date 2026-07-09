@@ -52,56 +52,34 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      const orderPayload = {
-        buyer_id: user?.id || null,
-        buyer_email: form.email,
-        buyer_name: form.name,
-        status: "processing",
-        total: grandTotal,
-        shipping_name: form.name,
-        shipping_address: form.address,
-        shipping_city: form.city,
-        shipping_zip: form.zip,
-        shipping_country: form.country,
-      };
-
-      let orderId;
-
-      if (user) {
-        const { data: order, error: orderErr } = await supabase
-          .from("orders")
-          .insert(orderPayload)
-          .select("id")
-          .single();
-
-        if (orderErr) throw orderErr;
-        orderId = order.id;
-
-        const itemsPayload = items.map(item => ({
-          order_id: orderId,
-          product_id: String(item.id),
-          product_name: item.name,
-          vendor_id: item.vendor_id || null,
-          vendor_name: item.vendor_name || null,
-          price: item.price,
-          qty: item.qty,
-          subtotal: +(item.price * item.qty).toFixed(2),
-        }));
-
-        const { error: itemsErr } = await supabase.from("order_items").insert(itemsPayload);
-        if (itemsErr) throw itemsErr;
-      } else {
-        orderId = "guest-" + Date.now();
+      if (!user) {
+        setError("Please sign in to check out.");
+        setPlacing(false);
+        return;
       }
 
-      clearCart();
-      router.push(`/order-success/${orderId}?total=${grandTotal}&name=${encodeURIComponent(form.name)}&items=${count}`);
+      const res = await fetch("/api/checkout/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+            vendor_id: item.vendor_id,
+            vendor_name: item.vendor_name,
+          })),
+          shipping: form,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Checkout failed.");
+
+      window.location.href = data.url;
     } catch (err) {
-      if (err?.message?.includes("does not exist") || err?.code === "42P01") {
-        setError("Database not set up yet. Your order couldn't be saved — please run the setup SQL first.");
-      } else {
-        setError(err?.message || "Something went wrong. Please try again.");
-      }
+      setError(err?.message || "Something went wrong. Please try again.");
       setPlacing(false);
     }
   };
@@ -268,41 +246,16 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Payment (mock) */}
+            {/* Payment */}
             <div className="bg-white border border-[#e2ddd6] rounded-2xl p-6">
-              <h2 className="text-sm font-semibold text-[#111] mb-5 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[#111] mb-2 flex items-center gap-2">
                 <CreditCard size={15} className="text-[#888]" /> Payment
               </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-[#555] block mb-1.5">Card number</label>
-                  <input
-                    className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
-                    placeholder="4242 4242 4242 4242"
-                    maxLength={19}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-[#555] block mb-1.5">Expiry</label>
-                    <input
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
-                      placeholder="MM / YY"
-                      maxLength={7}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-[#555] block mb-1.5">CVC</label>
-                    <input
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
-                      placeholder="123"
-                      maxLength={4}
-                    />
-                  </div>
-                </div>
-              </div>
+              <p className="text-sm text-[#888]">
+                You'll enter your card details on Stripe's secure checkout page after clicking "Continue to payment" below.
+              </p>
               <p className="text-[10px] text-[#bbb] mt-3 flex items-center gap-1">
-                <Shield size={10} /> Payments processed securely. Card data is not stored.
+                <Shield size={10} /> Payments processed securely by Stripe. Card data never touches our servers.
               </p>
             </div>
 
@@ -361,9 +314,9 @@ export default function CheckoutPage() {
                 className="w-full mt-5 bg-[#111] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {placing ? (
-                  <><Loader2 size={15} className="animate-spin" /> Placing order…</>
+                  <><Loader2 size={15} className="animate-spin" /> Redirecting to payment…</>
                 ) : (
-                  <>Place order · ${grandTotal.toFixed(2)}</>
+                  <>Continue to payment · ${grandTotal.toFixed(2)}</>
                 )}
               </button>
 

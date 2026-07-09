@@ -43,8 +43,16 @@ create table if not exists public.orders (
   shipping_city text,
   shipping_zip text,
   shipping_country text default 'US',
+  payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'failed', 'refunded')),
+  stripe_session_id text,
+  stripe_payment_intent text,
   created_at timestamptz default now()
 );
+
+-- Safe to re-run: add payment columns to pre-existing orders tables.
+alter table public.orders add column if not exists payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'failed', 'refunded'));
+alter table public.orders add column if not exists stripe_session_id text;
+alter table public.orders add column if not exists stripe_payment_intent text;
 
 alter table public.orders enable row level security;
 
