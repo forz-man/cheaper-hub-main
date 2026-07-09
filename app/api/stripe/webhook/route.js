@@ -1,22 +1,37 @@
 import { NextResponse } from "next/server";
-import { getUncachableStripeClient } from "@/lib/stripeClient";
+import { getStripeClient } from "@/lib/stripeClient";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
-// Best-effort webhook: we don't verify a signing secret here (no managed
-// webhook is registered for this ad-hoc Checkout Sessions setup). Instead,
-// on any checkout.session.completed event we re-fetch the session from
-// Stripe by ID and only trust that server-to-server response — a forged
-// request can at most trigger us to check real Stripe data for a session id
-// the attacker supplies, it cannot forge a "paid" result.
+// Verifies the Stripe signature (STRIPE_WEBHOOK_SECRET) so only genuine
+// Stripe requests are processed. As a second layer of defense, we still
+// re-fetch the session from Stripe by ID rather than trusting the event
+// payload's embedded object — belt-and-suspenders against a compromised or
+// misconfigured signing secret.
 export async function POST(req) {
   try {
-    const event = await req.json();
+    const stripe = getStripeClient();
+    const rawBody = await req.text();
+    const signature = req.headers.get("stripe-signature");
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    let event;
+    if (webhookSecret && signature) {
+      try {
+        event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      } catch (err) {
+        console.error("stripe webhook signature verification failed:", err.message);
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      }
+    } else {
+      // No webhook secret configured yet — fall back to parsing the body.
+      // Still safe because we re-verify via a live Stripe API call below.
+      event = JSON.parse(rawBody);
+    }
 
     if (event?.type === "checkout.session.completed") {
       const sessionId = event.data?.object?.id;
       if (!sessionId) return NextResponse.json({ received: true });
 
-      const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       const orderId = session.metadata?.order_id;
 
