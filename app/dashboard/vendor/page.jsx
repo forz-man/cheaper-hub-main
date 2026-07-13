@@ -20,21 +20,24 @@ const integrations = [
   { name: "WordPress", bg: "#21759b", desc: "Link your WordPress site with WooCommerce plugin", connected: false },
 ];
 
-const mockOrders = [
-  { id: "#3821", buyer: "Sarah K.", product: "Wireless Earbuds Pro", amount: 29.99, status: "delivered", date: "Jun 23" },
-  { id: "#3820", buyer: "James L.", product: "Linen Throw Blanket", amount: 18.00, status: "shipped", date: "Jun 23" },
-  { id: "#3818", buyer: "Amara D.", product: "Ceramic Mug Set (4)", amount: 12.50, status: "processing", date: "Jun 22" },
-  { id: "#3815", buyer: "Tom W.", product: "Wireless Earbuds Pro", amount: 29.99, status: "delivered", date: "Jun 21" },
-  { id: "#3812", buyer: "Priya N.", product: "Running Shoes X2", amount: 44.99, status: "delivered", date: "Jun 20" },
-];
-
 const statusConfig = {
   delivered: { label: "Delivered", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
   shipped: { label: "Shipped", color: "text-blue-700 bg-blue-50 border-blue-100" },
   processing: { label: "Processing", color: "text-amber-700 bg-amber-50 border-amber-100" },
+  cancelled: { label: "Cancelled", color: "text-gray-500 bg-gray-50 border-gray-200" },
   active: { label: "Active", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
   out_of_stock: { label: "Out of stock", color: "text-red-700 bg-red-50 border-red-100" },
   draft: { label: "Draft", color: "text-gray-500 bg-gray-50 border-gray-200" },
+};
+
+const payoutConfig = {
+  pending: { label: "Held by platform", color: "text-amber-700 bg-amber-50 border-amber-100" },
+  released: { label: "Released to you", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+};
+
+const NEXT_FULFILLMENT_ACTION = {
+  processing: { next: "shipped", label: "Mark shipped" },
+  shipped: { next: "delivered", label: "Mark delivered & release payout" },
 };
 
 const CATEGORIES = ["Electronics", "Fashion", "Home & Living", "Food & Bev", "Sports", "Books"];
@@ -115,6 +118,11 @@ export default function VendorDashboard() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [dbError, setDbError] = useState(null);
 
+  const [orderItems, setOrderItems] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [orderActionError, setOrderActionError] = useState(null);
+
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -141,6 +149,18 @@ export default function VendorDashboard() {
     setProductsLoading(false);
   }
 
+  async function loadOrders(u) {
+    setOrdersLoading(true);
+    const { data, error } = await supabase
+      .from("order_items")
+      .select("*, order:orders(id, buyer_name, buyer_email, payment_status, created_at)")
+      .eq("vendor_id", (u || user).id)
+      .order("created_at", { ascending: false });
+
+    if (!error) setOrderItems(data || []);
+    setOrdersLoading(false);
+  }
+
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -153,9 +173,30 @@ export default function VendorDashboard() {
       setUser(user);
       setLoading(false);
       loadProducts(user);
+      loadOrders(user);
     }
     checkAuth();
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleUpdateFulfillment = async (item, newStatus) => {
+    setUpdatingItemId(item.id);
+    setOrderActionError(null);
+    try {
+      const res = await fetch(`/api/orders/${item.order_id}/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fulfillment_status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update item");
+
+      setOrderItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, ...data.item } : it)));
+    } catch (err) {
+      setOrderActionError(err.message);
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -288,9 +329,9 @@ export default function VendorDashboard() {
               <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: "Total products", value: productsLoading ? "…" : String(products.length), sub: "Live listings", Icon: Package },
-                  { label: "Total orders", value: "82", sub: "+12 this month", Icon: ShoppingBag },
-                  { label: "Revenue", value: "$1,840", sub: "+8% vs last month", Icon: TrendingUp },
-                  { label: "Product views", value: "3,245", sub: "Last 30 days", Icon: Eye },
+                  { label: "Total orders", value: ordersLoading ? "…" : String(orderItems.length), sub: "Order items", Icon: ShoppingBag },
+                  { label: "Held by platform", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}`, sub: "Released after delivery", Icon: TrendingUp },
+                  { label: "Released to you", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}`, sub: "Total paid out", Icon: Eye },
                 ].map(s => <StatCard key={s.label} {...s} />)}
               </motion.div>
 
@@ -304,18 +345,22 @@ export default function VendorDashboard() {
                     </button>
                   </div>
                   <div className="divide-y divide-gray-50">
-                    {mockOrders.slice(0, 4).map((order) => (
-                      <div key={order.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                    {ordersLoading ? (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400">Loading orders…</div>
+                    ) : orderItems.length === 0 ? (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400">No orders yet</div>
+                    ) : orderItems.slice(0, 4).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
                         <div className="flex items-center gap-4 min-w-0">
-                          <span className="text-xs font-mono text-gray-400 flex-shrink-0">{order.id}</span>
+                          <span className="text-xs font-mono text-gray-400 flex-shrink-0">{item.order_id.slice(0, 8)}…</span>
                           <div className="min-w-0">
-                            <div className="text-sm font-medium text-black truncate">{order.product}</div>
-                            <div className="text-xs text-gray-400">{order.buyer} · {order.date}</div>
+                            <div className="text-sm font-medium text-black truncate">{item.product_name}</div>
+                            <div className="text-xs text-gray-400">{item.order?.buyer_name || "Buyer"} · {item.order?.created_at ? new Date(item.order.created_at).toLocaleDateString() : ""}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="font-semibold text-sm text-black">${order.amount}</span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusConfig[order.status].color}`}>{statusConfig[order.status].label}</span>
+                          <span className="font-semibold text-sm text-black">${Number(item.subtotal).toFixed(2)}</span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(statusConfig[item.fulfillment_status] || statusConfig.processing).color}`}>{(statusConfig[item.fulfillment_status] || statusConfig.processing).label}</span>
                         </div>
                       </div>
                     ))}
@@ -456,14 +501,20 @@ export default function VendorDashboard() {
           {/* ORDERS */}
           {activeTab === "orders" && (
             <motion.div key="orders" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
-              <div className="flex gap-1 flex-wrap mb-6">
-                {["All", "Processing", "Shipped", "Delivered"].map((label, i) => (
-                  <button key={label}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${i === 0 ? "bg-black text-white shadow-lg shadow-black/15" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"}`}>
-                    {label}
-                  </button>
-                ))}
+              <div className="mb-6 bg-white border border-gray-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp size={14} className="text-gray-400" />
+                </div>
+                <div className="text-xs text-gray-500">
+                  Payments are captured to the platform and held. Mark an item <span className="font-semibold text-black">delivered</span> once it&apos;s confirmed received to release your payout for it.
+                </div>
               </div>
+
+              {orderActionError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">
+                  {orderActionError}
+                </div>
+              )}
 
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-sm">
@@ -473,23 +524,50 @@ export default function VendorDashboard() {
                       <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Product</th>
                       <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Buyer</th>
                       <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Date</th>
+                      <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Fulfillment</th>
+                      <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Payout</th>
+                      <th className="px-5 py-3.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {mockOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="px-5 py-4 font-mono text-xs text-gray-400">{order.id}</td>
-                        <td className="px-5 py-4 font-medium text-black hidden md:table-cell">{order.product}</td>
-                        <td className="px-5 py-4 text-gray-400 hidden sm:table-cell">{order.buyer}</td>
-                        <td className="px-5 py-4 font-semibold text-black">${order.amount}</td>
-                        <td className="px-5 py-4">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusConfig[order.status].color}`}>{statusConfig[order.status].label}</span>
-                        </td>
-                        <td className="px-5 py-4 text-gray-400 text-xs hidden lg:table-cell">{order.date}</td>
-                      </tr>
-                    ))}
+                    {ordersLoading ? (
+                      <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">Loading orders…</td></tr>
+                    ) : orderItems.length === 0 ? (
+                      <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">No orders yet</td></tr>
+                    ) : orderItems.map((item) => {
+                      const fulfillment = item.fulfillment_status || "processing";
+                      const payout = item.payout_status || "pending";
+                      const action = NEXT_FULFILLMENT_ACTION[fulfillment];
+                      const notPaid = item.order?.payment_status !== "paid";
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-5 py-4 font-mono text-xs text-gray-400">{item.order_id.slice(0, 8)}…</td>
+                          <td className="px-5 py-4 font-medium text-black hidden md:table-cell">{item.product_name}</td>
+                          <td className="px-5 py-4 text-gray-400 hidden sm:table-cell">{item.order?.buyer_name || "—"}</td>
+                          <td className="px-5 py-4 font-semibold text-black">${Number(item.subtotal).toFixed(2)}</td>
+                          <td className="px-5 py-4">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(statusConfig[fulfillment] || statusConfig.processing).color}`}>{(statusConfig[fulfillment] || statusConfig.processing).label}</span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${payoutConfig[payout].color}`}>{payoutConfig[payout].label}</span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            {action ? (
+                              <button
+                                onClick={() => handleUpdateFulfillment(item, action.next)}
+                                disabled={updatingItemId === item.id || (action.next === "delivered" && notPaid)}
+                                title={action.next === "delivered" && notPaid ? "Order not paid yet" : undefined}
+                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : action.label}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

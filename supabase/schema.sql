@@ -72,8 +72,23 @@ create table if not exists public.order_items (
   vendor_name text,
   price numeric(10,2) not null,
   qty integer not null default 1,
-  subtotal numeric(10,2) not null
+  subtotal numeric(10,2) not null,
+  -- Per-vendor fulfillment + payout tracking. Money is captured to the
+  -- platform's own Stripe balance at checkout and held there; a vendor's
+  -- share is only "released" (marked payable) once their item is delivered.
+  fulfillment_status text default 'processing' check (fulfillment_status in ('processing', 'shipped', 'delivered', 'cancelled')),
+  payout_status text default 'pending' check (payout_status in ('pending', 'released')),
+  payout_amount numeric(10,2),
+  payout_released_at timestamptz,
+  created_at timestamptz default now()
 );
+
+-- Safe to re-run: add payout/fulfillment columns to pre-existing order_items tables.
+alter table public.order_items add column if not exists fulfillment_status text default 'processing' check (fulfillment_status in ('processing', 'shipped', 'delivered', 'cancelled'));
+alter table public.order_items add column if not exists payout_status text default 'pending' check (payout_status in ('pending', 'released'));
+alter table public.order_items add column if not exists payout_amount numeric(10,2);
+alter table public.order_items add column if not exists payout_released_at timestamptz;
+alter table public.order_items add column if not exists created_at timestamptz default now();
 
 alter table public.order_items enable row level security;
 
