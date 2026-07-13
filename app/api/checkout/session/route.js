@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server";
+import { createAdminClient } from "@/lib/supabaseAdmin";
 import { getUncachableStripeClient } from "@/lib/stripeClient";
 
 export async function POST(req) {
@@ -137,9 +138,20 @@ export async function POST(req) {
       success_url: `${origin}/order-success/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout?cancelled=1`,
       metadata: { order_id: orderId, buyer_id: user.id },
+      // Tags the resulting charge so vendor payouts (Stripe Transfers) can be
+      // traced back to this order and pulled from this charge's balance.
+      payment_intent_data: { transfer_group: orderId },
     });
 
-    await supabase.from("orders").update({ stripe_session_id: session.id }).eq("id", orderId);
+    // Buyers have no RLS update grant on orders (by design — see schema.sql),
+    // so this trusted, server-generated session id is written via the
+    // service-role admin client rather than the buyer's own session client.
+    const admin = createAdminClient();
+    const { error: sessionSaveErr } = await admin
+      .from("orders")
+      .update({ stripe_session_id: session.id })
+      .eq("id", orderId);
+    if (sessionSaveErr) throw sessionSaveErr;
 
     return NextResponse.json({ url: session.url, orderId });
   } catch (err) {

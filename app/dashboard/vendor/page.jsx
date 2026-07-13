@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Plug, Settings,
   LogOut, Plus, Upload, ArrowUpRight,
   TrendingUp, Eye, ChevronRight, Search, X,
-  Trash2, Store, Loader2, AlertTriangle,
+  Trash2, Store, Loader2, AlertTriangle, Landmark, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
@@ -122,6 +122,12 @@ export default function VendorDashboard() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [orderActionError, setOrderActionError] = useState(null);
+  const [orderActionWarning, setOrderActionWarning] = useState(null);
+
+  const [stripeStatus, setStripeStatus] = useState(null); // { connected, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted }
+  const [stripeStatusLoading, setStripeStatusLoading] = useState(false);
+  const [stripeActionLoading, setStripeActionLoading] = useState(false);
+  const [stripeActionError, setStripeActionError] = useState(null);
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -161,6 +167,19 @@ export default function VendorDashboard() {
     setOrdersLoading(false);
   }
 
+  async function loadStripeStatus() {
+    setStripeStatusLoading(true);
+    try {
+      const res = await fetch("/api/stripe/connect/status");
+      const data = await res.json();
+      if (res.ok) setStripeStatus(data);
+    } catch {
+      // best-effort; leave stripeStatus as-is
+    } finally {
+      setStripeStatusLoading(false);
+    }
+  }
+
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -174,13 +193,50 @@ export default function VendorDashboard() {
       setLoading(false);
       loadProducts(user);
       loadOrders(user);
+      loadStripeStatus();
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("stripe") === "return" || params.get("stripe") === "refresh") {
+        setActiveTab("payouts");
+        window.history.replaceState(null, "", "/dashboard/vendor");
+      }
     }
     checkAuth();
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleConnectStripe = async () => {
+    setStripeActionLoading(true);
+    setStripeActionError(null);
+    try {
+      const res = await fetch("/api/stripe/connect/onboard", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start payout setup");
+      window.location.href = data.url;
+    } catch (err) {
+      setStripeActionError(err.message);
+      setStripeActionLoading(false);
+    }
+  };
+
+  const handleOpenStripeDashboard = async () => {
+    setStripeActionLoading(true);
+    setStripeActionError(null);
+    try {
+      const res = await fetch("/api/stripe/connect/dashboard-link", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to open Stripe dashboard");
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setStripeActionError(err.message);
+    } finally {
+      setStripeActionLoading(false);
+    }
+  };
+
   const handleUpdateFulfillment = async (item, newStatus) => {
     setUpdatingItemId(item.id);
     setOrderActionError(null);
+    setOrderActionWarning(null);
     try {
       const res = await fetch(`/api/orders/${item.order_id}/items/${item.id}`, {
         method: "PATCH",
@@ -191,6 +247,7 @@ export default function VendorDashboard() {
       if (!res.ok) throw new Error(data.error || "Failed to update item");
 
       setOrderItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, ...data.item } : it)));
+      if (data.warning) setOrderActionWarning(data.warning);
     } catch (err) {
       setOrderActionError(err.message);
     } finally {
@@ -267,9 +324,12 @@ export default function VendorDashboard() {
     { id: "overview", label: "Overview", Icon: LayoutDashboard },
     { id: "products", label: "Products", Icon: Package, badge: products.length },
     { id: "orders", label: "Orders", Icon: ShoppingBag },
+    { id: "payouts", label: "Payouts", Icon: Landmark },
     { id: "integrations", label: "Integrations", Icon: Plug },
     { id: "settings", label: "Settings", Icon: Settings },
   ];
+
+  const payoutsReady = !!stripeStatus?.stripe_payouts_enabled;
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
@@ -515,6 +575,12 @@ export default function VendorDashboard() {
                   {orderActionError}
                 </div>
               )}
+              {orderActionWarning && (
+                <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 flex items-start justify-between gap-3">
+                  <span>{orderActionWarning}</span>
+                  <button onClick={() => { setOrderActionWarning(null); setActiveTab("payouts"); }} className="font-semibold underline flex-shrink-0">Payouts →</button>
+                </div>
+              )}
 
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                 <table className="w-full text-sm">
@@ -539,6 +605,7 @@ export default function VendorDashboard() {
                       const payout = item.payout_status || "pending";
                       const action = NEXT_FULFILLMENT_ACTION[fulfillment];
                       const notPaid = item.order?.payment_status !== "paid";
+                      const canRetryPayout = fulfillment === "delivered" && payout !== "released";
                       return (
                         <tr key={item.id} className="hover:bg-gray-50/80 transition-colors">
                           <td className="px-5 py-4 font-mono text-xs text-gray-400">{item.order_id.slice(0, 8)}…</td>
@@ -560,6 +627,14 @@ export default function VendorDashboard() {
                                 className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : action.label}
+                              </button>
+                            ) : canRetryPayout ? (
+                              <button
+                                onClick={() => handleUpdateFulfillment(item, "delivered")}
+                                disabled={updatingItemId === item.id}
+                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : "Retry payout"}
                               </button>
                             ) : (
                               <span className="text-xs text-gray-300">—</span>
@@ -629,6 +704,78 @@ export default function VendorDashboard() {
                   <button className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors">
                     <Upload size={14} /> Import CSV
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* PAYOUTS */}
+          {activeTab === "payouts" && (
+            <motion.div key="payouts" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+              <div className="max-w-2xl space-y-4">
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${payoutsReady ? "bg-emerald-50" : "bg-gray-50"}`}>
+                      {payoutsReady ? <CheckCircle2 size={18} className="text-emerald-600" /> : <Landmark size={18} className="text-gray-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-black text-sm">
+                        {stripeStatusLoading ? "Checking payout status…" : payoutsReady ? "Payouts connected" : stripeStatus?.connected ? "Finish connecting your bank account" : "Get paid via Stripe"}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                        {payoutsReady
+                          ? "Your bank account is connected. When you mark an item delivered on a paid order, we automatically transfer your share to your bank via Stripe."
+                          : stripeStatus?.connected
+                          ? "You've started setup but Stripe still needs a bit more information (identity or bank details) before payouts can go out."
+                          : "Connect a bank account through Stripe so we can pay you automatically once an order is delivered. Money is held by the platform until then."}
+                      </p>
+
+                      {stripeActionError && (
+                        <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{stripeActionError}</div>
+                      )}
+
+                      <div className="mt-4 flex gap-3">
+                        {!payoutsReady && (
+                          <button
+                            onClick={handleConnectStripe}
+                            disabled={stripeActionLoading}
+                            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {stripeActionLoading ? <Loader2 size={13} className="animate-spin" /> : <Landmark size={13} />}
+                            {stripeStatus?.connected ? "Finish setup" : "Connect bank account"}
+                          </button>
+                        )}
+                        {stripeStatus?.connected && (
+                          <button
+                            onClick={handleOpenStripeDashboard}
+                            disabled={stripeActionLoading}
+                            className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors disabled:opacity-50"
+                          >
+                            <ExternalLink size={13} /> View Stripe dashboard
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Held by platform</div>
+                    <div className="text-xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+                      ${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Paid out to you</div>
+                    <div className="text-xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+                      ${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-xs text-gray-500 leading-relaxed">
+                  How it works: buyers pay the platform at checkout. Once you mark an order item as delivered, we transfer your share straight to your connected bank account via Stripe — no manual invoicing needed.
                 </div>
               </div>
             </motion.div>

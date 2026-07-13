@@ -89,6 +89,8 @@ alter table public.order_items add column if not exists payout_status text defau
 alter table public.order_items add column if not exists payout_amount numeric(10,2);
 alter table public.order_items add column if not exists payout_released_at timestamptz;
 alter table public.order_items add column if not exists created_at timestamptz default now();
+-- Stripe Transfer id once a vendor's payout has actually been sent via Connect.
+alter table public.order_items add column if not exists stripe_transfer_id text;
 
 alter table public.order_items enable row level security;
 
@@ -125,8 +127,19 @@ create table if not exists public.profiles (
   full_name text,
   email text,
   role text check (role in ('buyer', 'vendor', 'admin')),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  -- Stripe Connect (Express) account used to pay vendors out after delivery.
+  stripe_account_id text,
+  stripe_charges_enabled boolean default false,
+  stripe_payouts_enabled boolean default false,
+  stripe_details_submitted boolean default false
 );
+
+-- Safe to re-run: add Stripe Connect columns to pre-existing profiles tables.
+alter table public.profiles add column if not exists stripe_account_id text;
+alter table public.profiles add column if not exists stripe_charges_enabled boolean default false;
+alter table public.profiles add column if not exists stripe_payouts_enabled boolean default false;
+alter table public.profiles add column if not exists stripe_details_submitted boolean default false;
 
 alter table public.profiles enable row level security;
 
@@ -274,3 +287,22 @@ create policy "orders_vendor_update" on public.orders
       and order_items.vendor_id = auth.uid()
   ))
   with check (status in ('processing', 'shipped', 'delivered', 'cancelled'));
+
+-- RLS policies only constrain which rows/values are allowed — they do NOT
+-- stop a vendor from including other columns (e.g. payment_status) in the
+-- same UPDATE statement as long as `status` still passes the check above.
+-- Lock this down with column-level privileges so vendors can only ever
+-- write the `status` column on orders; payment/session fields are only
+-- ever written by trusted server code using the service-role admin client.
+revoke update on public.orders from authenticated;
+grant update (status) on public.orders to authenticated;
+
+-- Same class of leak on profiles: Stripe Connect fields must never be
+-- readable or writable by any client-side session (browser code never
+-- needs them directly — every route that touches them uses the
+-- service-role admin client). Without this, a vendor could read another
+-- vendor's stripe_account_id (public read policy) and overwrite their own
+-- profile's stripe_account_id with it (owner write policy), then use the
+-- Stripe dashboard-link endpoint to log into someone else's account.
+revoke select (stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted) on public.profiles from authenticated, anon;
+revoke update (stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted) on public.profiles from authenticated, anon;

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { getStripeClient } from "@/lib/stripeClient";
 import { NextResponse } from "next/server";
 
 // Percentage the platform keeps from each vendor's item before releasing
@@ -56,7 +57,11 @@ export async function PATCH(request, { params }) {
 
     const currentStatus = item.fulfillment_status || "processing";
     const allowed = VALID_TRANSITIONS[currentStatus] || [];
-    if (!allowed.includes(newStatus)) {
+    // Special case: allow re-running "delivered" on an already-delivered item
+    // whose payout is still pending, so a failed/held transfer can be retried
+    // without faking a fulfillment status change.
+    const isPayoutRetry = newStatus === "delivered" && currentStatus === "delivered" && item.payout_status !== "released";
+    if (!allowed.includes(newStatus) && !isPayoutRetry) {
       return NextResponse.json(
         { error: `Cannot move from "${currentStatus}" to "${newStatus}"` },
         { status: 422 }
@@ -64,11 +69,12 @@ export async function PATCH(request, { params }) {
     }
 
     const update = { fulfillment_status: newStatus };
+    let payoutWarning = null;
 
     if (newStatus === "delivered") {
       const { data: order, error: orderErr } = await admin
         .from("orders")
-        .select("payment_status")
+        .select("payment_status, stripe_payment_intent")
         .eq("id", orderId)
         .single();
 
@@ -82,24 +88,82 @@ export async function PATCH(request, { params }) {
         );
       }
 
-      update.payout_status = "released";
-      update.payout_amount = +(Number(item.subtotal) * (1 - PLATFORM_FEE_PCT / 100)).toFixed(2);
-      update.payout_released_at = new Date().toISOString();
+      const payoutAmount = +(Number(item.subtotal) * (1 - PLATFORM_FEE_PCT / 100)).toFixed(2);
+
+      // Try to actually move the money via Stripe Connect. If the vendor
+      // hasn't finished onboarding, or the transfer fails for any reason,
+      // we still let the item be marked delivered (shipment already
+      // happened) but leave payout_status as "pending" so it's obviously
+      // still owed rather than silently lost.
+      const { data: vendorProfile } = await admin
+        .from("profiles")
+        .select("stripe_account_id, stripe_payouts_enabled")
+        .eq("id", item.vendor_id)
+        .single();
+
+      if (!vendorProfile?.stripe_account_id || !vendorProfile.stripe_payouts_enabled) {
+        payoutWarning = "Item marked delivered, but this vendor hasn't finished connecting their bank account yet — payout is still held.";
+      } else if (!order.stripe_payment_intent) {
+        payoutWarning = "Item marked delivered, but no payment record was found for this order — payout was not sent.";
+      } else {
+        try {
+          const stripe = getStripeClient();
+          const paymentIntent = await stripe.paymentIntents.retrieve(order.stripe_payment_intent);
+          const chargeId = typeof paymentIntent.latest_charge === "string"
+            ? paymentIntent.latest_charge
+            : paymentIntent.latest_charge?.id;
+
+          // Idempotency key keyed on the item id: if this request is retried
+          // (client retry, network blip, or a concurrent duplicate call),
+          // Stripe returns the original transfer instead of creating a
+          // second one — this is what actually prevents double-payouts,
+          // since a DB-only guard can't close the race on its own.
+          const transfer = await stripe.transfers.create(
+            {
+              amount: Math.round(payoutAmount * 100),
+              currency: "usd",
+              destination: vendorProfile.stripe_account_id,
+              transfer_group: orderId,
+              ...(chargeId ? { source_transaction: chargeId } : {}),
+            },
+            { idempotencyKey: `payout-item-${item.id}` }
+          );
+
+          update.payout_status = "released";
+          update.payout_amount = payoutAmount;
+          update.payout_released_at = new Date().toISOString();
+          update.stripe_transfer_id = transfer.id;
+        } catch (transferErr) {
+          console.error("stripe transfer error:", transferErr);
+          payoutWarning = `Item marked delivered, but the payout transfer failed (${transferErr.message}). It's still held — you can retry once resolved.`;
+        }
+      }
     }
 
     const { data: updated, error: updateErr } = await admin
       .from("order_items")
       .update(update)
       .eq("id", itemId)
-      .select("id, fulfillment_status, payout_status, payout_amount, payout_released_at")
+      .select("id, fulfillment_status, payout_status, payout_amount, payout_released_at, stripe_transfer_id")
       .single();
 
     if (updateErr) {
-      console.error("order item status update error:", updateErr);
+      // If a Stripe transfer already went out, this is now a reconciliation
+      // problem, not a normal failure — money moved but our record of it
+      // didn't save. Log loudly with the transfer id so it can be found and
+      // fixed manually instead of silently disappearing.
+      if (update.stripe_transfer_id) {
+        console.error(
+          `CRITICAL: Stripe transfer ${update.stripe_transfer_id} for order_item ${itemId} succeeded but failed to save to the database:`,
+          updateErr
+        );
+      } else {
+        console.error("order item status update error:", updateErr);
+      }
       return NextResponse.json({ error: updateErr.message || "Failed to update item" }, { status: 500 });
     }
 
-    return NextResponse.json({ item: updated });
+    return NextResponse.json({ item: updated, warning: payoutWarning });
   } catch (err) {
     console.error("PATCH /api/orders/[id]/items/[itemId] error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
