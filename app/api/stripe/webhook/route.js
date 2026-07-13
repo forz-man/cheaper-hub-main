@@ -15,7 +15,13 @@ export async function POST(req) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
-    if (webhookSecret && signature) {
+    if (webhookSecret) {
+      // Secret is configured: signature is mandatory. Missing/invalid
+      // signature must hard-fail, never silently fall back to the raw body.
+      if (!signature) {
+        console.error("stripe webhook rejected: missing stripe-signature header");
+        return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+      }
       try {
         event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
       } catch (err) {
