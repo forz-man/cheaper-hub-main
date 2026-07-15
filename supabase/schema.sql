@@ -16,12 +16,25 @@ create table if not exists public.products (
   features text[] default array[]::text[],
   specs jsonb default '{}'::jsonb,
   images jsonb default '[]'::jsonb,
+  -- Store import tracking (populated when product is synced from an external platform)
+  external_id text,
+  source_platform text,
+  source_url text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
--- Adds the images column to a pre-existing products table (safe to re-run).
+-- Safe to re-run: add columns to pre-existing products tables.
 alter table public.products add column if not exists images jsonb default '[]'::jsonb;
+alter table public.products add column if not exists external_id text;
+alter table public.products add column if not exists source_platform text;
+alter table public.products add column if not exists source_url text;
+
+-- Unique index for upsert deduplication when syncing from external platforms.
+-- Allows the same vendor to have the same product from different platforms.
+create unique index if not exists products_vendor_external_platform_idx
+  on public.products(vendor_id, external_id, source_platform)
+  where external_id is not null and source_platform is not null;
 
 alter table public.products enable row level security;
 
@@ -253,7 +266,7 @@ grant execute on function public.get_user_display_names(uuid[]) to authenticated
 create table if not exists public.store_connections (
   id            uuid default gen_random_uuid() primary key,
   vendor_id     uuid references auth.users(id) on delete cascade not null,
-  platform      text not null check (platform in ('shopify','woocommerce','wix','wordpress')),
+  platform      text not null,
   store_url     text not null,
   credentials   jsonb not null default '{}',   -- encrypted at rest by Supabase; never expose raw
   status        text not null default 'pending' check (status in ('pending','connected','error','syncing')),
@@ -264,6 +277,17 @@ create table if not exists public.store_connections (
   updated_at    timestamptz default now(),
   unique(vendor_id, platform, store_url)
 );
+
+-- Update the platform check constraint to include all supported platforms.
+-- Drop the old auto-named constraint (if it exists) and add a named one.
+alter table public.store_connections
+  drop constraint if exists store_connections_platform_check;
+alter table public.store_connections
+  add constraint store_connections_platform_check
+  check (platform in (
+    'shopify','woocommerce','wix','wordpress',
+    'etsy','squarespace','bigcommerce','prestashop','magento2','ecwid'
+  ));
 
 alter table public.store_connections enable row level security;
 

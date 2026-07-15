@@ -13,13 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
-
-const integrations = [
-  { name: "Shopify", bg: "#96bf48", desc: "Sync your Shopify product catalog automatically", connected: false },
-  { name: "WooCommerce", bg: "#7f54b3", desc: "Import products from your WooCommerce store", connected: false },
-  { name: "Wix", bg: "#1a1a1a", desc: "Connect your Wix store and sync inventory", connected: false },
-  { name: "WordPress", bg: "#21759b", desc: "Link your WordPress site with WooCommerce plugin", connected: false },
-];
+import IntegrationsTab from "@/components/dashboard/IntegrationsTab";
 
 const statusConfig = {
   delivered: { label: "Delivered", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
@@ -706,60 +700,7 @@ export default function VendorDashboard() {
           {/* INTEGRATIONS */}
           {activeTab === "integrations" && (
             <motion.div key="integrations" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
-              <div className="mb-6">
-                <p className="text-sm text-gray-400">Connect your existing store to automatically sync your products.</p>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4 mb-8">
-                {integrations.map(({ name, bg, desc, connected }) => (
-                  <div key={name} className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-gray-300 hover:shadow-md hover:shadow-black/5 transition-all duration-300">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ backgroundColor: bg }}>
-                          {name[0]}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-black text-sm">{name}</div>
-                          {connected && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              <span className="text-[10px] text-emerald-600 font-medium">Connected</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <button className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-colors ${
-                        connected
-                          ? "border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600"
-                          : "bg-black text-white border-black hover:bg-gray-800"
-                      }`}>
-                        {connected ? "Disconnect" : "Connect"}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-400">{desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
-                    <Upload size={18} className="text-gray-400" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-black text-sm">Manual upload</div>
-                    <div className="text-xs text-gray-400 mt-0.5">Don&apos;t have an integrated store? Add products directly or import via CSV.</div>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={openAddProduct} className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors">
-                    <Plus size={14} /> Add single product
-                  </button>
-                  <button className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors">
-                    <Upload size={14} /> Import CSV
-                  </button>
-                </div>
-              </div>
+              <IntegrationsTab onAddProduct={openAddProduct} />
             </motion.div>
           )}
 

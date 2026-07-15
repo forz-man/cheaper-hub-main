@@ -1,500 +1,625 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
 import {
-  CheckCircle, AlertCircle, RefreshCw, Trash2, Plus,
-  ChevronRight, ExternalLink, Loader2, X, Eye, EyeOff,
-  Clock, Zap,
+  Plus, RefreshCw, Trash2, Loader2, CheckCircle2,
+  AlertTriangle, ExternalLink, X, ChevronRight, Upload,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-// ── Platform definitions ──────────────────────────────────────────────────────
+// ── Platform definitions ───────────────────────────────────────────────────────
 
-const PLATFORMS = {
-  woocommerce: {
-    label:   "WooCommerce",
-    color:   "#7f54b3",
-    logo:    "WC",
-    desc:    "Import products from your WooCommerce store via the REST API.",
-    docsUrl: "https://woocommerce.com/document/woocommerce-rest-api/",
-    fields:  [
-      { key: "consumer_key",    label: "Consumer Key",    type: "text",     placeholder: "ck_xxxxxxxxxxxx",         help: "Generate in WooCommerce → Settings → Advanced → REST API" },
-      { key: "consumer_secret", label: "Consumer Secret", type: "password", placeholder: "cs_xxxxxxxxxxxx",         help: "Created alongside the Consumer Key" },
-    ],
-    storeUrlLabel:       "Store URL",
+const PLATFORMS = [
+  {
+    id: "woocommerce",
+    name: "WooCommerce",
+    color: "#7f54b3",
+    tagline: "WordPress e-commerce plugin",
+    storeUrlLabel: "Store URL",
     storeUrlPlaceholder: "https://yourstore.com",
-    storeUrlHelp:        "The root URL of your WordPress/WooCommerce site",
-  },
-  shopify: {
-    label:   "Shopify",
-    color:   "#96bf48",
-    logo:    "SH",
-    desc:    "Sync your Shopify catalogue using a private app access token.",
-    docsUrl: "https://help.shopify.com/en/manual/apps/app-types/private-apps",
-    fields:  [
-      { key: "access_token", label: "Access Token", type: "password", placeholder: "shpat_xxxxxxxxxxxx", help: "Create a private app in Shopify → Settings → Apps → Develop apps" },
+    fields: [
+      { name: "consumer_key",    label: "Consumer Key",    placeholder: "ck_...",  type: "text"     },
+      { name: "consumer_secret", label: "Consumer Secret", placeholder: "cs_...",  type: "password" },
     ],
-    storeUrlLabel:       "Store domain",
+    helpText: "WooCommerce → Settings → Advanced → REST API",
+    helpUrl:  "https://woo.com/document/woocommerce-rest-api/",
+  },
+  {
+    id: "shopify",
+    name: "Shopify",
+    color: "#96bf48",
+    tagline: "Leading hosted storefront",
+    storeUrlLabel: "Store domain",
     storeUrlPlaceholder: "yourstore.myshopify.com",
-    storeUrlHelp:        "Just the domain — no https:// needed",
-  },
-  wix: {
-    label:   "Wix",
-    color:   "#1a1a1a",
-    logo:    "WX",
-    desc:    "Pull products from your Wix store using API keys.",
-    docsUrl: "https://dev.wix.com/api/rest/getting-started/api-keys",
-    fields:  [
-      { key: "api_key",  label: "API Key",  type: "password", placeholder: "IST.xxxxxxxx…", help: "Generate in Wix Dashboard → API Keys" },
-      { key: "site_id",  label: "Site ID",  type: "text",     placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", help: "Found in Wix Dashboard → Settings → General Info → Site ID" },
+    fields: [
+      { name: "access_token", label: "Admin API Access Token", placeholder: "shpat_...", type: "password" },
     ],
-    storeUrlLabel:       "Wix site URL",
-    storeUrlPlaceholder: "https://yourname.wixsite.com/mysite",
-    storeUrlHelp:        "Your published Wix site address",
+    helpText: "Shopify Admin → Apps → Develop apps → Create a private app",
+    helpUrl:  "https://help.shopify.com/en/manual/apps/app-types/private-apps",
   },
-  wordpress: {
-    label:   "WordPress",
-    color:   "#21759b",
-    logo:    "WP",
-    desc:    "Connect WordPress (with or without WooCommerce) via Application Passwords.",
-    docsUrl: "https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/",
-    fields:  [
-      { key: "username",     label: "WordPress username",     type: "text",     placeholder: "admin",                  help: "Your WordPress admin username" },
-      { key: "app_password", label: "Application Password",   type: "password", placeholder: "xxxx xxxx xxxx xxxx xxxx xxxx", help: "Generate in WP Admin → Users → Profile → Application Passwords" },
+  {
+    id: "wix",
+    name: "Wix",
+    color: "#1a1a1a",
+    tagline: "Wix Stores",
+    storeUrlLabel: null,
+    fields: [
+      { name: "api_key", label: "API Key",  placeholder: "Your Wix API key",  type: "password" },
+      { name: "site_id", label: "Site ID",  placeholder: "Your Wix site ID",  type: "text"     },
     ],
-    storeUrlLabel:       "WordPress URL",
+    helpText: "Wix Developer Center → API Keys",
+    helpUrl:  "https://dev.wix.com/docs/rest/articles/getting-started/api-keys",
+  },
+  {
+    id: "wordpress",
+    name: "WordPress",
+    color: "#21759b",
+    tagline: "WooCommerce or custom CPTs",
+    storeUrlLabel: "Site URL",
     storeUrlPlaceholder: "https://yoursite.com",
-    storeUrlHelp:        "Root URL of your WordPress installation",
+    fields: [
+      { name: "username",     label: "WP Username",             placeholder: "admin",           type: "text"     },
+      { name: "app_password", label: "Application Password",    placeholder: "xxxx xxxx xxxx",  type: "password" },
+    ],
+    helpText: "Users → Profile → Application Passwords (WP 5.6+)",
+    helpUrl:  "https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/",
+    note: "Has WooCommerce? Add its REST API keys too for richer product data.",
+    extraFields: [
+      { name: "consumer_key",    label: "WooCommerce Consumer Key (optional)",    placeholder: "ck_...", type: "text"     },
+      { name: "consumer_secret", label: "WooCommerce Consumer Secret (optional)", placeholder: "cs_...", type: "password" },
+    ],
   },
-};
+  {
+    id: "etsy",
+    name: "Etsy",
+    color: "#f56400",
+    tagline: "Handmade & vintage marketplace",
+    storeUrlLabel: null,
+    fields: [
+      { name: "api_key", label: "API Key (keystring)", placeholder: "Your Etsy API key", type: "password" },
+      { name: "shop_id", label: "Shop Name or ID",     placeholder: "MyShopName or 12345678", type: "text" },
+    ],
+    helpText: "Create an app at etsy.com/developers to get your keystring",
+    helpUrl:  "https://www.etsy.com/developers/register",
+  },
+  {
+    id: "squarespace",
+    name: "Squarespace",
+    color: "#111111",
+    tagline: "All-in-one website builder",
+    storeUrlLabel: "Site URL",
+    storeUrlPlaceholder: "https://yoursite.squarespace.com",
+    fields: [
+      { name: "api_key", label: "Commerce API Key", placeholder: "Your Squarespace API key", type: "password" },
+    ],
+    helpText: "Settings → Advanced → API Keys → Generate Key (enable Store Catalog)",
+    helpUrl:  "https://developers.squarespace.com/commerce-apis/authentication-and-rate-limits",
+  },
+  {
+    id: "bigcommerce",
+    name: "BigCommerce",
+    color: "#34313f",
+    tagline: "Enterprise e-commerce platform",
+    storeUrlLabel: null,
+    fields: [
+      { name: "store_hash",   label: "Store Hash",    placeholder: "abc123xyz",           type: "text"     },
+      { name: "client_id",    label: "Client ID",     placeholder: "Your API client ID",  type: "text"     },
+      { name: "access_token", label: "Access Token",  placeholder: "Your access token",   type: "password" },
+    ],
+    helpText: "Advanced Settings → API Accounts → Create API account",
+    helpUrl:  "https://developer.bigcommerce.com/docs/rest-management/authentication/api-accounts",
+  },
+  {
+    id: "prestashop",
+    name: "PrestaShop",
+    color: "#df0067",
+    tagline: "Open-source e-commerce",
+    storeUrlLabel: "Store URL",
+    storeUrlPlaceholder: "https://yourstore.com",
+    fields: [
+      { name: "api_key", label: "Webservice Key", placeholder: "Your PrestaShop key", type: "password" },
+    ],
+    helpText: "Advanced Parameters → Webservice → Add new key",
+    helpUrl:  "https://devdocs.prestashop-project.org/8/webservice/tutorials/creating-access/",
+  },
+  {
+    id: "magento2",
+    name: "Magento 2",
+    color: "#f26322",
+    tagline: "Adobe Commerce platform",
+    storeUrlLabel: "Store URL",
+    storeUrlPlaceholder: "https://yourstore.com",
+    fields: [
+      { name: "access_token", label: "Admin Access Token", placeholder: "Your integration token", type: "password" },
+    ],
+    helpText: "System → Integrations → Add integration → grant Catalog resources",
+    helpUrl:  "https://developer.adobe.com/commerce/webapi/rest/tutorials/prerequisite-tasks/",
+  },
+  {
+    id: "ecwid",
+    name: "Ecwid",
+    color: "#0076ff",
+    tagline: "E-commerce for any website",
+    storeUrlLabel: "Your website URL (optional)",
+    storeUrlPlaceholder: "https://yourwebsite.com",
+    fields: [
+      { name: "store_id",     label: "Store ID",      placeholder: "12345678",          type: "text"     },
+      { name: "secret_token", label: "Secret Token",  placeholder: "Your secret token", type: "password" },
+    ],
+    helpText: "Ecwid Control Panel → Apps → Legacy API keys",
+    helpUrl:  "https://support.ecwid.com/hc/en-us/articles/207808285-Ecwid-REST-API-introduction",
+  },
+];
 
-const stagger = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
-};
 const fadeUp = {
-  hidden:  { opacity: 0, y: 14 },
+  hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: "easeOut" } },
 };
 
-// ── Status badge ──────────────────────────────────────────────────────────────
+const stagger = {
+  hidden:   { opacity: 0 },
+  visible:  { opacity: 1, transition: { staggerChildren: 0.055, delayChildren: 0.04 } },
+};
 
-function StatusBadge({ status }) {
-  const map = {
-    connected: { icon: CheckCircle, cls: "text-emerald-700 bg-emerald-50 border-emerald-100", label: "Connected" },
-    error:     { icon: AlertCircle, cls: "text-red-700 bg-red-50 border-red-100",             label: "Error"     },
-    syncing:   { icon: Loader2,     cls: "text-blue-700 bg-blue-50 border-blue-100",           label: "Syncing"   },
-    pending:   { icon: Clock,       cls: "text-gray-500 bg-gray-50 border-gray-200",           label: "Pending"   },
-  };
-  const { icon: Icon, cls, label } = map[status] ?? map.pending;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>
-      <Icon size={10} className={status === "syncing" ? "animate-spin" : ""} />
-      {label}
-    </span>
-  );
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function relativeTime(ts) {
+  if (!ts) return null;
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// ── Connect modal ─────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 
-function ConnectModal({ platformKey, onClose, onConnected }) {
-  const platform = PLATFORMS[platformKey];
-  const [storeUrl,    setStoreUrl]    = useState("");
-  const [creds,       setCreds]       = useState({});
-  const [showSecrets, setShowSecrets] = useState({});
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState("");
+export default function IntegrationsTab({ onAddProduct }) {
+  const [connections, setConnections]         = useState([]);
+  const [loading, setLoading]                 = useState(true);
 
-  const toggleShow = key =>
-    setShowSecrets(p => ({ ...p, [key]: !p[key] }));
+  // Connect modal state
+  const [modal, setModal]                     = useState(null); // platform object or null
+  const [storeUrl, setStoreUrl]               = useState("");
+  const [creds, setCreds]                     = useState({});
+  const [showExtra, setShowExtra]             = useState(false);
+  const [connectStep, setConnectStep]         = useState("idle"); // idle | connecting | syncing | done | error
+  const [connectError, setConnectError]       = useState(null);
+  const [syncResult, setSyncResult]           = useState(null); // { imported, total }
 
-  const handleSubmit = async e => {
-    e.preventDefault();
-    setError("");
+  // Per-connection sync state
+  const [syncing, setSyncing]                 = useState({}); // { [connectionId]: bool }
+  const [syncErrors, setSyncErrors]           = useState({}); // { [connectionId]: string }
+  const [syncResults, setSyncResults]         = useState({}); // { [connectionId]: { imported, total } }
+
+  // Disconnect
+  const [disconnecting, setDisconnecting]     = useState({}); // { [connectionId]: bool }
+
+  const loadConnections = useCallback(async () => {
     setLoading(true);
     try {
+      const res = await fetch("/api/integrations");
+      if (res.ok) setConnections(await res.json());
+    } catch { /* silent */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadConnections(); }, [loadConnections]);
+
+  // ── Open connect modal ───────────────────────────────────────────────────────
+  const openModal = (platform) => {
+    setModal(platform);
+    setStoreUrl("");
+    setCreds({});
+    setShowExtra(false);
+    setConnectStep("idle");
+    setConnectError(null);
+    setSyncResult(null);
+  };
+
+  const closeModal = () => {
+    if (connectStep === "connecting" || connectStep === "syncing") return;
+    setModal(null);
+  };
+
+  // ── Save & connect ───────────────────────────────────────────────────────────
+  const handleConnect = async () => {
+    if (!modal) return;
+    setConnectStep("connecting");
+    setConnectError(null);
+
+    // Auto-generate store_url for platforms that don't have one
+    let resolvedUrl = storeUrl.trim();
+    if (!modal.storeUrlLabel) {
+      if (modal.id === "etsy")        resolvedUrl = `https://www.etsy.com/shop/${creds.shop_id || "shop"}`;
+      else if (modal.id === "wix")    resolvedUrl = "https://manage.wix.com";
+      else if (modal.id === "bigcommerce") resolvedUrl = `https://${creds.store_hash || "store"}.mybigcommerce.com`;
+      else if (modal.id === "ecwid")  resolvedUrl = `https://app.ecwid.com/store/${creds.store_id || "store"}`;
+      else                            resolvedUrl = `https://api.${modal.id}.com`;
+    }
+
+    try {
       const res = await fetch("/api/integrations", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ platform: platformKey, store_url: storeUrl, credentials: creds }),
+        body: JSON.stringify({ platform: modal.id, store_url: resolvedUrl, credentials: creds }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message || "Connection failed"); setLoading(false); return; }
-      onConnected(data);
-      onClose();
+      if (!res.ok) { setConnectStep("error"); setConnectError(data.message || "Failed to connect"); return; }
+
+      // Connection saved — now sync
+      setConnectStep("syncing");
+      const syncRes = await fetch("/api/integrations/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connection_id: data.id }),
+      });
+      const syncData = await syncRes.json();
+      if (!syncRes.ok) { setConnectStep("error"); setConnectError(syncData.message || "Connected but sync failed"); return; }
+
+      setSyncResult({ imported: syncData.imported, total: syncData.total });
+      setConnectStep("done");
+      await loadConnections();
     } catch (e) {
-      setError("Network error — please try again");
-      setLoading(false);
+      setConnectStep("error");
+      setConnectError(e.message || "Network error");
     }
   };
 
-  return (
-    <motion.div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
-        initial={{ opacity: 0, y: 30, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.96 }}
-        transition={{ type: "spring", damping: 26, stiffness: 300 }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header stripe */}
-        <div className="h-1" style={{ backgroundColor: platform.color }} />
+  // ── Sync an existing connection ──────────────────────────────────────────────
+  const handleSync = async (conn) => {
+    setSyncing(prev => ({ ...prev, [conn.id]: true }));
+    setSyncErrors(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
+    setSyncResults(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
 
-        <div className="p-6">
-          {/* Title row */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl text-white text-sm font-bold flex items-center justify-center shadow-md"
-                style={{ backgroundColor: platform.color }}>
-                {platform.logo}
-              </div>
-              <div>
-                <div className="font-bold text-black text-sm">Connect {platform.label}</div>
-                <a href={platform.docsUrl} target="_blank" rel="noreferrer"
-                  className="text-[10px] text-gray-400 hover:text-black flex items-center gap-0.5 transition-colors">
-                  View setup guide <ExternalLink size={9} className="ml-0.5" />
-                </a>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-1 text-gray-300 hover:text-black transition-colors rounded-lg hover:bg-gray-100">
-              <X size={18} />
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500 mb-5 leading-relaxed">{platform.desc}</p>
-
-          {error && (
-            <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-2">
-              <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Store URL */}
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-                {platform.storeUrlLabel} <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="url"
-                value={storeUrl}
-                onChange={e => setStoreUrl(e.target.value)}
-                placeholder={platform.storeUrlPlaceholder}
-                required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all text-black placeholder:text-gray-300"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">{platform.storeUrlHelp}</p>
-            </div>
-
-            {/* Credential fields */}
-            {platform.fields.map(f => (
-              <div key={f.key}>
-                <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-                  {f.label} <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={f.type === "password" && !showSecrets[f.key] ? "password" : "text"}
-                    value={creds[f.key] || ""}
-                    onChange={e => setCreds(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all text-black placeholder:text-gray-300 pr-10"
-                  />
-                  {f.type === "password" && (
-                    <button type="button" onClick={() => toggleShow(f.key)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors">
-                      {showSecrets[f.key] ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1">{f.help}</p>
-              </div>
-            ))}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 mt-2"
-            >
-              {loading ? <><Loader2 size={14} className="animate-spin" /> Testing connection…</> : <>Connect {platform.label} <ChevronRight size={14} /></>}
-            </button>
-          </form>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── Connected store card ──────────────────────────────────────────────────────
-
-function StoreCard({ conn, onDisconnect, onSync }) {
-  const platform = PLATFORMS[conn.platform];
-  const isSyncing = conn.status === "syncing";
-
-  return (
-    <motion.div variants={fadeUp}
-      className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-300 hover:shadow-lg hover:shadow-black/5 transition-all duration-300">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-sm"
-            style={{ backgroundColor: platform?.color ?? "#555" }}>
-            {platform?.logo ?? conn.platform[0].toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-black text-sm truncate">{platform?.label ?? conn.platform}</div>
-            <div className="text-[11px] text-gray-400 truncate max-w-[200px]">{conn.store_url}</div>
-          </div>
-        </div>
-        <StatusBadge status={conn.status} />
-      </div>
-
-      {conn.status === "error" && conn.error_message && (
-        <div className="mb-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-[11px] text-red-700">
-          {conn.error_message}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 text-[11px] text-gray-400 mb-4">
-        {conn.product_count > 0 && (
-          <span className="flex items-center gap-1">
-            <Zap size={10} className="text-gray-300" />
-            {conn.product_count} products synced
-          </span>
-        )}
-        {conn.last_synced_at && (
-          <>
-            {conn.product_count > 0 && <span>·</span>}
-            <span>Last sync {new Date(conn.last_synced_at).toLocaleDateString()}</span>
-          </>
-        )}
-        {!conn.last_synced_at && !conn.product_count && (
-          <span>Never synced</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onSync(conn)}
-          disabled={isSyncing}
-          className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          <RefreshCw size={12} className={isSyncing ? "animate-spin" : ""} />
-          {isSyncing ? "Syncing…" : "Sync products"}
-        </button>
-        <button
-          onClick={() => onDisconnect(conn)}
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 border border-gray-200 px-4 py-2 rounded-xl hover:border-red-200 hover:text-red-600 transition-all"
-        >
-          <Trash2 size={12} />
-          Disconnect
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Add platform card ─────────────────────────────────────────────────────────
-
-function AddPlatformCard({ platformKey, onConnect, alreadyConnected }) {
-  const platform = PLATFORMS[platformKey];
-  return (
-    <motion.div variants={fadeUp}
-      className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-300 hover:shadow-lg hover:shadow-black/5 transition-all duration-300">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl text-white text-sm font-bold flex items-center justify-center shadow-sm"
-            style={{ backgroundColor: platform.color }}>
-            {platform.logo}
-          </div>
-          <div>
-            <div className="font-semibold text-black text-sm">{platform.label}</div>
-            {alreadyConnected && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[10px] text-emerald-600 font-medium">Connected</span>
-              </div>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={() => onConnect(platformKey)}
-          className="text-xs font-semibold px-4 py-2 rounded-xl border transition-all duration-200 bg-black text-white border-black hover:bg-gray-800 flex items-center gap-1.5 flex-shrink-0"
-        >
-          <Plus size={12} /> Connect
-        </button>
-      </div>
-      <p className="text-[11px] text-gray-400 leading-relaxed">{platform.desc}</p>
-    </motion.div>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-
-export default function IntegrationsTab({ openAddProduct }) {
-  const [connections, setConnections] = useState([]);
-  const [loadingConns, setLoadingConns] = useState(true);
-  const [connectModal, setConnectModal] = useState(null); // platformKey | null
-  const [syncResult,   setSyncResult]   = useState(null); // { id, message }
-  const [disconnecting, setDisconnecting] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/integrations")
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setConnections(d); })
-      .catch(() => {})
-      .finally(() => setLoadingConns(false));
-  }, []);
-
-  const handleConnected = newConn => {
-    setConnections(prev => {
-      const exists = prev.find(c => c.id === newConn.id);
-      return exists ? prev.map(c => c.id === newConn.id ? newConn : c) : [newConn, ...prev];
-    });
-    setSyncResult({ id: newConn.id, message: "✓ Store connected. Click \u201cSync products\u201d to import your catalogue." });
-    setTimeout(() => setSyncResult(null), 6000);
-  };
-
-  const handleSync = async conn => {
-    setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, status: "syncing" } : c));
-    setSyncResult(null);
     try {
       const res = await fetch("/api/integrations/sync", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ connection_id: conn.id }),
+        body: JSON.stringify({ connection_id: conn.id }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, status: "error", error_message: data.message } : c));
-        setSyncResult({ id: conn.id, message: `Sync failed: ${data.message}`, error: true });
+        setSyncErrors(prev => ({ ...prev, [conn.id]: data.message || "Sync failed" }));
       } else {
-        setConnections(prev => prev.map(c => c.id === conn.id
-          ? { ...c, status: "connected", product_count: data.total, last_synced_at: new Date().toISOString(), error_message: null }
-          : c));
-        setSyncResult({ id: conn.id, message: `✓ Synced ${data.total} products successfully.` });
-        setTimeout(() => setSyncResult(null), 5000);
+        setSyncResults(prev => ({ ...prev, [conn.id]: { imported: data.imported, total: data.total } }));
+        await loadConnections();
       }
-    } catch {
-      setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, status: "error", error_message: "Network error" } : c));
+    } catch (e) {
+      setSyncErrors(prev => ({ ...prev, [conn.id]: e.message || "Network error" }));
+    } finally {
+      setSyncing(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
     }
   };
 
-  const handleDisconnect = async conn => {
-    if (!confirm(`Disconnect ${PLATFORMS[conn.platform]?.label ?? conn.platform}? This won't delete synced products.`)) return;
-    setDisconnecting(conn.id);
+  // ── Disconnect ───────────────────────────────────────────────────────────────
+  const handleDisconnect = async (conn) => {
+    if (!confirm(`Disconnect ${conn.platform}? This won't remove already-synced products.`)) return;
+    setDisconnecting(prev => ({ ...prev, [conn.id]: true }));
     try {
       await fetch(`/api/integrations/${conn.id}`, { method: "DELETE" });
       setConnections(prev => prev.filter(c => c.id !== conn.id));
-    } catch { /* ignore */ }
-    setDisconnecting(null);
+    } finally {
+      setDisconnecting(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
+    }
   };
 
-  const connectedPlatforms = new Set(connections.map(c => c.platform));
-  const unconnectedPlatforms = Object.keys(PLATFORMS).filter(k => !connectedPlatforms.has(k));
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const connFor = (platformId) => connections.find(c => c.platform === platformId);
 
   return (
-    <>
-      {/* Connected stores */}
-      {loadingConns ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-          <Loader2 size={16} className="animate-spin" /> Loading connections…
-        </div>
-      ) : connections.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Connected stores</h3>
-          <motion.div variants={stagger} initial="hidden" animate="visible" className="grid sm:grid-cols-2 gap-4">
-            {connections.map(conn => (
-              <StoreCard
-                key={conn.id}
-                conn={conn}
-                onSync={handleSync}
-                onDisconnect={handleDisconnect}
-              />
-            ))}
-          </motion.div>
+    <div>
+      <p className="text-sm text-gray-400 mb-6">
+        Connect your existing store to automatically import and sync your products to Cheaper.
+      </p>
 
-          {/* Sync result toast */}
-          <AnimatePresence>
-            {syncResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className={`mt-4 flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-medium border ${
-                  syncResult.error
-                    ? "bg-red-50 border-red-200 text-red-700"
-                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                }`}
-              >
-                {syncResult.error ? <AlertCircle size={13} /> : <CheckCircle size={13} />}
-                {syncResult.message}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+      {/* Platform grid */}
+      <motion.div
+        variants={stagger} initial="hidden" animate="visible"
+        className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
+      >
+        {PLATFORMS.map((platform) => {
+          const conn = connFor(platform.id);
+          const isSyncing     = conn && syncing[conn.id];
+          const syncErr       = conn && syncErrors[conn.id];
+          const syncRes       = conn && syncResults[conn.id];
+          const isDisconnecting = conn && disconnecting[conn.id];
 
-      {/* Available platforms to connect */}
-      {unconnectedPlatforms.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-            {connections.length > 0 ? "Add another store" : "Connect your store"}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">
-            Link your existing store to automatically import and sync your product catalogue.
-          </p>
-          <motion.div variants={stagger} initial="hidden" animate="visible" className="grid sm:grid-cols-2 gap-4">
-            {unconnectedPlatforms.map(k => (
-              <AddPlatformCard
-                key={k}
-                platformKey={k}
-                alreadyConnected={connectedPlatforms.has(k)}
-                onConnect={setConnectModal}
-              />
-            ))}
-          </motion.div>
-        </div>
-      )}
+          return (
+            <motion.div key={platform.id} variants={fadeUp}
+              className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-300 hover:shadow-md hover:shadow-black/5 transition-all duration-300 flex flex-col gap-4"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: platform.color }}
+                  >
+                    {platform.name[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-black text-sm leading-tight">{platform.name}</div>
+                    <div className="text-[11px] text-gray-400 mt-0.5 leading-tight">{platform.tagline}</div>
+                  </div>
+                </div>
+                {conn ? (
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      conn.status === "error" ? "bg-red-500" :
+                      conn.status === "syncing" || isSyncing ? "bg-amber-400 animate-pulse" :
+                      "bg-emerald-500"
+                    }`} />
+                    <span className={`text-[10px] font-medium ${
+                      conn.status === "error" ? "text-red-600" :
+                      conn.status === "syncing" || isSyncing ? "text-amber-600" :
+                      "text-emerald-600"
+                    }`}>
+                      {isSyncing ? "Syncing…" : conn.status === "error" ? "Error" : conn.status === "syncing" ? "Syncing…" : "Connected"}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
 
-      {/* Manual upload */}
+              {/* Connected details */}
+              {conn && (
+                <div className="text-[11px] text-gray-400 space-y-0.5">
+                  {conn.product_count > 0 && (
+                    <div><span className="font-semibold text-black">{conn.product_count}</span> products synced</div>
+                  )}
+                  {conn.last_synced_at && (
+                    <div>Last synced {relativeTime(conn.last_synced_at)}</div>
+                  )}
+                  {conn.store_url && !conn.store_url.includes("manage.wix") && !conn.store_url.includes("mybigcommerce") && !conn.store_url.includes("app.ecwid") && !conn.store_url.includes("etsy.com/shop") && (
+                    <a href={conn.store_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-gray-400 hover:text-black transition-colors">
+                      <ExternalLink size={10} />{conn.store_url.replace(/^https?:\/\//, "").slice(0, 30)}
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Sync result */}
+              {syncRes && (
+                <div className="text-[11px] bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 text-emerald-700">
+                  ✓ Synced {syncRes.imported} of {syncRes.total} products
+                </div>
+              )}
+              {syncErr && (
+                <div className="text-[11px] bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5 text-red-700">
+                  {syncErr}
+                </div>
+              )}
+
+              {/* Actions */}
+              {conn ? (
+                <div className="flex gap-2 mt-auto pt-1">
+                  <button
+                    onClick={() => handleSync(conn)}
+                    disabled={isSyncing || isDisconnecting}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-black text-white px-3 py-2 rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-40"
+                  >
+                    {isSyncing
+                      ? <><Loader2 size={12} className="animate-spin" /> Syncing…</>
+                      : <><RefreshCw size={12} /> Sync now</>
+                    }
+                  </button>
+                  <button
+                    onClick={() => handleDisconnect(conn)}
+                    disabled={isSyncing || isDisconnecting}
+                    className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 transition-colors disabled:opacity-40"
+                    title="Disconnect"
+                  >
+                    {isDisconnecting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => openModal(platform)}
+                  className="mt-auto pt-1 w-full flex items-center justify-center gap-1.5 text-xs font-semibold bg-black text-white px-3 py-2 rounded-xl hover:bg-gray-800 transition-colors"
+                >
+                  <Plus size={12} /> Connect
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </motion.div>
+
+      {/* Manual upload card */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-start gap-4 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0">
-            <Plus size={18} className="text-gray-400" />
+        <div className="flex items-start gap-4 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+            <Upload size={18} className="text-gray-400" />
           </div>
           <div>
             <div className="font-semibold text-black text-sm">Manual upload</div>
-            <div className="text-xs text-gray-400 mt-0.5">Don't have an integrated store? Add products one by one or import via CSV.</div>
+            <div className="text-xs text-gray-400 mt-0.5">Don&apos;t have an integrated store? Add products directly.</div>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={openAddProduct}
-            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-all"
-          >
-            <Plus size={14} /> Add single product
-          </button>
-          <button className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-all">
-            Import CSV
-          </button>
-        </div>
+        <button
+          onClick={onAddProduct}
+          className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors"
+        >
+          <Plus size={14} /> Add single product
+        </button>
       </div>
 
-      {/* Connect modal */}
+      {/* ── Connect modal ─────────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {connectModal && (
-          <ConnectModal
-            platformKey={connectModal}
-            onClose={() => setConnectModal(null)}
-            onConnected={handleConnected}
-          />
+        {modal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && closeModal()}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="bg-white rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: modal.color }}>
+                    {modal.name[0]}
+                  </div>
+                  <h2 className="font-bold text-black text-base">Connect {modal.name}</h2>
+                </div>
+                <button onClick={closeModal} disabled={connectStep === "connecting" || connectStep === "syncing"}
+                  className="text-gray-400 hover:text-black transition-colors disabled:opacity-40">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto flex-1">
+
+                {/* Done state */}
+                {connectStep === "done" ? (
+                  <div className="flex flex-col items-center py-6 gap-3">
+                    <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                      <CheckCircle2 size={28} className="text-emerald-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-black">{modal.name} connected!</p>
+                      {syncResult && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Imported <span className="font-semibold text-black">{syncResult.imported}</span> of <span className="font-semibold text-black">{syncResult.total}</span> products
+                        </p>
+                      )}
+                    </div>
+                    <button onClick={() => setModal(null)}
+                      className="bg-black text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors mt-2">
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Help text */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-3 flex items-start justify-between gap-2">
+                      <p className="text-xs text-gray-500">{modal.helpText}</p>
+                      <a href={modal.helpUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-[11px] font-semibold text-black hover:underline flex items-center gap-0.5 flex-shrink-0">
+                        Guide <ChevronRight size={11} />
+                      </a>
+                    </div>
+
+                    {/* Note (WordPress) */}
+                    {modal.note && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-2.5 text-xs text-amber-700">
+                        {modal.note}
+                      </div>
+                    )}
+
+                    {/* Error */}
+                    {(connectStep === "error" && connectError) && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                        <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-red-700">{connectError}</p>
+                      </div>
+                    )}
+
+                    {/* Store URL field */}
+                    {modal.storeUrlLabel && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 block mb-1.5">
+                          {modal.storeUrlLabel} <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          value={storeUrl}
+                          onChange={(e) => setStoreUrl(e.target.value)}
+                          placeholder={modal.storeUrlPlaceholder}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+                          disabled={connectStep === "connecting" || connectStep === "syncing"}
+                        />
+                      </div>
+                    )}
+
+                    {/* Credential fields */}
+                    {modal.fields.map((field) => (
+                      <div key={field.name}>
+                        <label className="text-xs font-semibold text-gray-500 block mb-1.5">
+                          {field.label} <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type={field.type}
+                          value={creds[field.name] || ""}
+                          onChange={(e) => setCreds(prev => ({ ...prev, [field.name]: e.target.value }))}
+                          placeholder={field.placeholder}
+                          autoComplete="off"
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+                          disabled={connectStep === "connecting" || connectStep === "syncing"}
+                        />
+                      </div>
+                    ))}
+
+                    {/* Extra fields (e.g. WooCommerce keys on WP) */}
+                    {modal.extraFields && (
+                      <>
+                        <button
+                          onClick={() => setShowExtra(v => !v)}
+                          className="text-xs font-semibold text-gray-500 hover:text-black flex items-center gap-1 transition-colors"
+                        >
+                          <ChevronRight size={12} className={`transition-transform ${showExtra ? "rotate-90" : ""}`} />
+                          {showExtra ? "Hide" : "Add"} WooCommerce keys (optional)
+                        </button>
+                        {showExtra && modal.extraFields.map((field) => (
+                          <div key={field.name}>
+                            <label className="text-xs font-semibold text-gray-500 block mb-1.5">{field.label}</label>
+                            <input
+                              type={field.type}
+                              value={creds[field.name] || ""}
+                              onChange={(e) => setCreds(prev => ({ ...prev, [field.name]: e.target.value }))}
+                              placeholder={field.placeholder}
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+                              disabled={connectStep === "connecting" || connectStep === "syncing"}
+                            />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer buttons */}
+              {connectStep !== "done" && (
+                <div className="flex gap-3 p-5 border-t border-gray-200 flex-shrink-0">
+                  <button
+                    onClick={closeModal}
+                    disabled={connectStep === "connecting" || connectStep === "syncing"}
+                    className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:border-gray-400 transition-colors disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConnect}
+                    disabled={
+                      connectStep === "connecting" ||
+                      connectStep === "syncing" ||
+                      (modal.storeUrlLabel && !storeUrl.trim()) ||
+                      modal.fields.some(f => !creds[f.name]?.trim())
+                    }
+                    className="flex-1 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {connectStep === "connecting" ? (
+                      <><Loader2 size={14} className="animate-spin" /> Connecting…</>
+                    ) : connectStep === "syncing" ? (
+                      <><Loader2 size={14} className="animate-spin" /> Syncing products…</>
+                    ) : (
+                      "Save & connect"
+                    )}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
