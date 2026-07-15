@@ -310,3 +310,23 @@ grant update (status) on public.orders to authenticated;
 -- Stripe dashboard-link endpoint to log into someone else's account.
 revoke select (stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted) on public.profiles from authenticated, anon;
 revoke update (stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted) on public.profiles from authenticated, anon;
+
+-- ── Contact messages ─────────────────────────────────────────────────────────
+-- Submissions from the public /contact page. Anyone (including logged-out
+-- visitors) can insert; nobody can read/update/delete via the client —
+-- only server code using the service-role admin client can list these.
+create table if not exists public.contact_messages (
+  id          uuid default gen_random_uuid() primary key,
+  name        text not null,
+  email       text not null,
+  subject     text,
+  message     text not null,
+  status      text not null default 'new' check (status in ('new', 'read', 'resolved')),
+  created_at  timestamptz default now()
+);
+
+alter table public.contact_messages enable row level security;
+
+create policy "contact_messages_public_insert" on public.contact_messages
+  for insert to anon, authenticated
+  with check (true);
