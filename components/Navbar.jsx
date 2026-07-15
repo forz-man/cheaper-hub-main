@@ -11,10 +11,21 @@ import {
   BadgePercent
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
+import useNotifications from "@/hooks/useNotifications";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
+import { dashboardTabHref } from "@/lib/auth";
 import { GrDashboard } from "react-icons/gr";
 import { label } from "framer-motion/client";
+
+function formatNotifTime(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return "Just now";
+  if (diff < 3_600_000) return Math.floor(diff / 60_000) + "m ago";
+  if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + "h ago";
+  return "Earlier";
+}
 
 function AwardIcon({ size = 20, className = "" }) {
   return (
@@ -59,15 +70,39 @@ export default function Navbar() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { count: cartCount, openCart } = useCart();
-  const [unreadCount, setUnreadCount] = useState(2);
+  const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
+  const [profileRole, setProfileRole] = useState(null);
+  const userRole = metadataRole || profileRole;
+
+  // Metadata doesn't always carry the role (e.g. older accounts created
+  // before /select-role started writing it to auth metadata) — fall back to
+  // the profiles table so links still route correctly.
+  useEffect(() => {
+    if (!user?.id || metadataRole || !supabase) return;
+    let cancelled = false;
+    supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
+      if (!cancelled && data?.role) setProfileRole(data.role);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id, metadataRole]);
+
+  const {
+    items: notifItems,
+    unreadMessages,
+    unreadCount: notifUnreadCount,
+    markAllSeen,
+    markMessageRead,
+  } = useNotifications(user?.id, userRole);
   const [wishlistCount, setWishlistCount] = useState(3);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeLink, setActiveLink] = useState("home");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
 
@@ -95,6 +130,9 @@ export default function Navbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifDropdown(false);
+      }
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
        
       }
@@ -115,11 +153,6 @@ export default function Navbar() {
     };
   }, [isMobileMenuOpen]);
 
-  useEffect(() => {
-    if (!user) return;
-    setUnreadCount(2);
-  }, [user]);
-
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -138,9 +171,6 @@ export default function Navbar() {
       setSearchQuery("");
     }
   };
-
-  // Derive role from auth metadata
-  const userRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
 
   // "Sell" is only shown to visitors who haven't signed up yet.
   // Buyers don't need it (they're buyers). Vendors are already selling.
@@ -241,22 +271,95 @@ export default function Navbar() {
                     <Search size={18} className="text-gray-600 sm:w-5 sm:h-5" />
                   </button>
 
-                  <button className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100">
-                    <Bell size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
-                    <span className="absolute top-1 right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
-                  </button>
+                  <div className="relative" ref={notifRef}>
+                    <button
+                      onClick={() => {
+                        const opening = !showNotifDropdown;
+                        setShowNotifDropdown(opening);
+                        setShowDropdown(false);
+                        if (opening) markAllSeen();
+                      }}
+                      className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100"
+                    >
+                      <Bell size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+                      {notifUnreadCount > 0 && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
+                      )}
+                    </button>
+
+                    {showNotifDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowNotifDropdown(false)}></div>
+                        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden">
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
+                          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-black">Notifications</p>
+                            {notifItems.length > 0 && (
+                              <button onClick={markAllSeen} className="text-[11px] font-medium text-gray-400 hover:text-black">
+                                Mark all read
+                              </button>
+                            )}
+                          </div>
+                          <div className="max-h-96 overflow-y-auto">
+                            {notifItems.length === 0 ? (
+                              <div className="px-4 py-10 text-center">
+                                <Bell size={22} className="text-gray-300 mx-auto mb-2" />
+                                <p className="text-xs text-gray-400">You're all caught up</p>
+                              </div>
+                            ) : (
+                              notifItems.map((item) => {
+                                const Icon = item.type === "message" ? MessageCircle : item.type === "payout" ? AwardIcon : Package;
+                                return (
+                                  <button
+                                    key={item.id}
+                                    onClick={async () => {
+                                      setShowNotifDropdown(false);
+                                      if (item.type === "message") {
+                                        await markMessageRead(item.id.replace("message-", ""));
+                                      }
+                                      router.push(item.href);
+                                    }}
+                                    className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                  >
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${item.unread ? "bg-black text-white" : "bg-gray-50 text-gray-400"}`}>
+                                      <Icon size={14} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs truncate ${item.unread ? "font-bold text-black" : "font-medium text-gray-700"}`}>{item.title}</p>
+                                      <p className="text-[11px] text-gray-400 truncate mt-0.5">{item.body}</p>
+                                      <p className="text-[10px] text-gray-300 mt-0.5">{formatNotifTime(item.timestamp)}</p>
+                                    </div>
+                                    {item.unread && <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                          <Link
+                            href="/notifications"
+                            onClick={() => setShowNotifDropdown(false)}
+                            className="block text-center text-xs font-semibold text-black py-2.5 border-t border-gray-100 hover:bg-gray-50"
+                          >
+                            View all
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </div>
 
               
-                  <Link href="/wishlist" className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex">
-                    <div className="relative">
-                      <Heart size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
-                      {wishlistCount > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-red-500 text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                          {wishlistCount > 9 ? '9+' : wishlistCount}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
+                  {userRole !== "vendor" && userRole !== "admin" && (
+                    <Link href={dashboardTabHref(userRole, "wishlist")} className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex">
+                      <div className="relative">
+                        <Heart size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+                        {wishlistCount > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-red-500 text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                            {wishlistCount > 9 ? '9+' : wishlistCount}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  )}
 
                   <button onClick={openCart} className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100">
                     <div className="relative">
@@ -273,9 +376,9 @@ export default function Navbar() {
                   <Link href="/messages" className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex">
                     <div className="relative">
                       <MessageCircle size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
-                      {unreadCount > 0 && (
+                      {unreadMessages > 0 && (
                         <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-black text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                          {unreadCount > 9 ? '9+' : unreadCount}
+                          {unreadMessages > 9 ? '9+' : unreadMessages}
                         </span>
                       )}
                     </div>
@@ -284,7 +387,7 @@ export default function Navbar() {
          
                   <div className="relative" ref={dropdownRef}>
                     <button
-                      onClick={() => setShowDropdown(!showDropdown)}
+                      onClick={() => { setShowDropdown(!showDropdown); setShowNotifDropdown(false); }}
                       className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-full hover:bg-gray-100 border-2 border-transparent hover:border-black/20"
                     >
                       <div className="relative">
@@ -327,13 +430,15 @@ export default function Navbar() {
 
                           <div className="py-1">
                             {[
-                              { icon: User, label: "Profile", href: "/profile" },
-                              { icon: GrDashboard, label: "Dashboard", href: "/dashboard" },
-                              { icon: ShoppingBag, label: "Orders", href: "/orders" },
-                              { icon: Heart, label: "Wishlist", href: "/wishlist", badge: wishlistCount },
+                              { icon: User, label: "Profile", href: dashboardTabHref(userRole, "overview") },
+                              { icon: GrDashboard, label: "Dashboard", href: dashboardTabHref(userRole) },
+                              { icon: ShoppingBag, label: "Orders", href: dashboardTabHref(userRole, "orders") },
+                              ...(userRole !== "vendor" && userRole !== "admin"
+                                ? [{ icon: Heart, label: "Wishlist", href: dashboardTabHref(userRole, "wishlist"), badge: wishlistCount }]
+                                : []),
                               { icon: ShoppingCart, label: "Cart", action: () => { setShowDropdown(false); openCart(); }, badge: cartCount },
-                              { icon: MessageCircle, label: "Messages", href: "/messages", badge: unreadCount },
-                              { icon: Settings, label: "Settings", href: "/settings" },
+                              { icon: MessageCircle, label: "Messages", href: "/messages", badge: unreadMessages },
+                              { icon: Settings, label: "Settings", href: dashboardTabHref(userRole, "settings") },
                             ].map(({ icon: Icon, label, href, badge, action }) => {
                               const cls = "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-black w-full text-left";
                               const inner = (
@@ -396,7 +501,7 @@ export default function Navbar() {
                   ) : (
                     <Menu size={20} className="text-black sm:w-5 sm:h-5" />
                   )}
-                  {unreadCount > 0 && !isMobileMenuOpen && (
+                  {(unreadMessages > 0 || notifUnreadCount > 0) && !isMobileMenuOpen && (
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full"></span>
                   )}
                 </div>
@@ -462,7 +567,11 @@ export default function Navbar() {
                  
                   <div className="border-t border-gray-200 mt-2 pt-2">
                     <div className="grid grid-cols-4 gap-1">
-                      <Link href="/wishlist" className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50">
+                      <Link
+                        href={dashboardTabHref(userRole, "wishlist")}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 ${userRole === "vendor" || userRole === "admin" ? "hidden" : ""}`}
+                      >
                         <Heart size={20} className="text-gray-600" />
                         <span className="text-[8px] text-gray-400">Wishlist</span>
                       </Link>
@@ -475,18 +584,20 @@ export default function Navbar() {
                         )}
                         <span className="text-[8px] text-gray-400">Cart</span>
                       </button>
-                      <Link href="/messages" className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
+                      <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
                         <MessageCircle size={20} className="text-gray-600" />
-                        {unreadCount > 0 && (
+                        {unreadMessages > 0 && (
                           <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-                            {unreadCount}
+                            {unreadMessages}
                           </span>
                         )}
                         <span className="text-[8px] text-gray-400">Messages</span>
                       </Link>
-                      <Link href="/notifications" className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
+                      <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
                         <Bell size={20} className="text-gray-600" />
-                        <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        {notifUnreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        )}
                         <span className="text-[8px] text-gray-400">Alerts</span>
                       </Link>
                     </div>

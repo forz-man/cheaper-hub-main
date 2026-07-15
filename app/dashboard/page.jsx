@@ -35,7 +35,11 @@ export default function DashboardPage() {
       if (cancelled) return;
 
       // No role on file — ask the user instead of assigning one.
-      router.replace(role ? destinationForRole(role) : "/select-role?from=dashboard");
+      const tab = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tab")
+        : null;
+      const dest = role ? destinationForRole(role) : "/select-role?from=dashboard";
+      router.replace(role && tab ? `${dest}?tab=${tab}` : dest);
       setResolving(false);
     }
     resolveRole();

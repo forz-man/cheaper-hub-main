@@ -188,6 +188,17 @@ function MessagesPageInner() {
     if (isMobile) setShowList(false);
     router.replace(`/messages?conversationId=${conv.id}`, { scroll: false });
     inputRef.current?.focus();
+
+    // Mark the other participant's messages read (real DB write) and clear
+    // the badge locally right away.
+    if (conv.unread_count > 0) {
+      setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
+      fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: conv.id }),
+      }).catch(() => {});
+    }
   };
 
   const handleSend = async (e) => {
@@ -341,6 +352,7 @@ function MessagesPageInner() {
                     filtered.map(conv => {
                       const name    = conv.other_party_name || "Unknown";
                       const isActive = selectedConv?.id === conv.id;
+                      const hasUnread = conv.unread_count > 0;
                       return (
                         <button
                           key={conv.id}
@@ -355,7 +367,7 @@ function MessagesPageInner() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-0.5">
-                              <p className="text-sm font-semibold text-black truncate">{name}</p>
+                              <p className={`text-sm truncate ${hasUnread ? "font-bold text-black" : "font-semibold text-black"}`}>{name}</p>
                               <span className="text-[10px] text-gray-400 flex-shrink-0">
                                 {formatTime(conv.last_message_at || conv.created_at)}
                               </span>
@@ -372,13 +384,17 @@ function MessagesPageInner() {
                                 {conv.product.name}
                               </p>
                             )}
-                            <p className="text-xs text-gray-400 truncate">
+                            <p className={`text-xs truncate ${hasUnread ? "text-black font-medium" : "text-gray-400"}`}>
                               {conv.last_message || "No messages yet"}
                             </p>
                           </div>
-                          {isActive && (
+                          {hasUnread ? (
+                            <span className="min-w-[18px] h-[18px] bg-black text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 mt-1 flex-shrink-0">
+                              {conv.unread_count > 9 ? "9+" : conv.unread_count}
+                            </span>
+                          ) : isActive ? (
                             <div className="w-1.5 h-1.5 rounded-full bg-black mt-2 flex-shrink-0" />
-                          )}
+                          ) : null}
                         </button>
                       );
                     })

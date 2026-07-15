@@ -108,12 +108,22 @@ function StatCard({ label, value, sub, Icon }) {
   );
 }
 
+const VALID_TABS = ["overview", "products", "orders", "payouts", "integrations", "settings"];
+
 export default function VendorDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddProduct, setShowAddProduct] = useState(false);
+
+  // Deep-link support: /dashboard/vendor?tab=orders (used by the navbar's
+  // Profile/Orders/Settings links).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab && VALID_TABS.includes(tab)) setActiveTab(tab);
+  }, []);
 
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);

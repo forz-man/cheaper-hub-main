@@ -52,6 +52,42 @@ export async function POST(request) {
   }
 }
 
+// PATCH /api/messages — mark all messages in a conversation as read for the
+// current user (only messages sent by the *other* participant are affected).
+export async function PATCH(request) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { conversation_id } = await request.json();
+    if (!conversation_id) {
+      return NextResponse.json({ message: "conversation_id is required" }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .eq("conversation_id", conversation_id)
+      .neq("sender_id", user.id)
+      .eq("is_read", false);
+
+    if (error) {
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json(
+      { message: err.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
 // GET /api/messages?conversationId=<uuid> — fetch all messages in a conversation
 export async function GET(request) {
   try {

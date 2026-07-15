@@ -173,7 +173,26 @@ export async function GET(request) {
       } catch (_) { /* ignore */ }
     }
 
-    // 6 — enrich each conversation with resolved names
+    // 6 — unread counts: messages sent by the other participant, not yet read
+    let unreadMap = {};
+    const convIds = convs.map(c => c.id);
+    if (convIds.length > 0) {
+      try {
+        const { data: unread } = await supabase
+          .from("messages")
+          .select("conversation_id")
+          .in("conversation_id", convIds)
+          .eq("is_read", false)
+          .neq("sender_id", userId);
+        if (unread) {
+          for (const m of unread) {
+            unreadMap[m.conversation_id] = (unreadMap[m.conversation_id] || 0) + 1;
+          }
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    // 7 — enrich each conversation with resolved names
     //   Seller: profiles → product.vendor_name → "Seller"
     //   Buyer:  profiles → orders.buyer_name   → "Buyer"
     const enriched = convs.map(conv => {
@@ -192,6 +211,7 @@ export async function GET(request) {
         other_party_id:   otherPartyId,
         other_party_name: otherName,
         product,
+        unread_count:     unreadMap[conv.id] || 0,
       };
     });
 

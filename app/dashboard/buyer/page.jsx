@@ -108,12 +108,22 @@ function StatCard({ label, value, sub, Icon }) {
   );
 }
 
+const VALID_TABS = ["overview", "orders", "wishlist", "settings"];
+
 export default function BuyerDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [wishlist, setWishlist] = useState(mockWishlist);
+
+  // Deep-link support: /dashboard/buyer?tab=orders (used by the navbar's
+  // Profile/Orders/Wishlist/Settings links).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab && VALID_TABS.includes(tab)) setActiveTab(tab);
+  }, []);
 
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
