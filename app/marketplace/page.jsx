@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, Grid, List, ChevronDown, SlidersHorizontal, X,
@@ -49,19 +50,28 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15, stiffness: 100 } },
 };
 
-export default function MarketplacePage() {
+function MarketplaceContent() {
   const { count, openCart } = useCart();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [products, setProducts]           = useState([]);
   const [loading, setLoading]             = useState(true);
   const [fromDb, setFromDb]               = useState(false);
   const [viewMode, setViewMode]           = useState("grid");
   const [showFilters, setShowFilters]     = useState(false);
-  const [searchQuery, setSearchQuery]     = useState("");
+  const [searchQuery, setSearchQuery]     = useState(() => searchParams.get("q") || "");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get("category") || "all");
   const [sortBy, setSortBy]               = useState("newest");
   const [priceRange, setPriceRange]       = useState([0, 1000]);
+
+  // Keep the search box in sync if the ?q= param changes from elsewhere
+  // (e.g. navbar/hero search while already on this page).
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    setSearchQuery((current) => (current === q ? current : q));
+  }, [searchParams]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -110,6 +120,18 @@ export default function MarketplacePage() {
     const t = setTimeout(loadProducts, 300);
     return () => clearTimeout(t);
   }, [loadProducts]);
+
+  // Reflect search/category into the URL so it's shareable and survives
+  // the navbar/hero search linking here with ?q=...
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (selectedCategory !== "all") params.set("category", selectedCategory);
+    const qs = params.toString();
+    const target = qs ? `/marketplace?${qs}` : "/marketplace";
+    const current = `/marketplace${window.location.search}`;
+    if (target !== current) router.replace(target, { scroll: false });
+  }, [searchQuery, selectedCategory, router]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -448,5 +470,17 @@ export default function MarketplacePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+      </div>
+    }>
+      <MarketplaceContent />
+    </Suspense>
   );
 }

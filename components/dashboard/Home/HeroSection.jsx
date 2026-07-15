@@ -12,7 +12,7 @@ const HeroSection = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (query.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(query)}`;
+      window.location.href = `/marketplace?q=${encodeURIComponent(query)}`;
     }
   };
 

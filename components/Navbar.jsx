@@ -166,7 +166,7 @@ export default function Navbar() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+      router.push(`/marketplace?q=${encodeURIComponent(searchQuery)}`);
       setShowSearch(false);
       setSearchQuery("");
     }
