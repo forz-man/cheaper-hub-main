@@ -80,6 +80,7 @@ function normalizeProduct(raw) {
     seller_total_products: raw.seller_total_products || raw.sellerTotalProducts || 0,
     seller_response_time: raw.seller_response_time || raw.sellerResponseTime || "24 hours",
     seller_about: raw.seller_about || raw.sellerAbout || "Seller information not available.",
+    images: Array.isArray(raw.images) ? raw.images : [],
   };
 }
 
@@ -98,6 +99,7 @@ export default function ProductPage({ params }) {
 
   const { addItem, openCart, count: cartCount } = useCart();
   const [wishlisted, setWishlisted] = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
   const [copied, setCopied] = useState(false);
@@ -278,8 +280,12 @@ export default function ProductPage({ params }) {
                   {pct}% off
                 </div>
               )}
-              <div className="flex items-center justify-center h-[340px] sm:h-[420px] bg-[#f9f8f6]">
-                <Package size={72} className="text-[#ddd]" />
+              <div className="flex items-center justify-center h-[340px] sm:h-[420px] bg-[#f9f8f6] overflow-hidden">
+                {product.images?.[activeImage] ? (
+                  <img src={product.images[activeImage]} alt={product.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Package size={72} className="text-[#ddd]" />
+                )}
               </div>
               <div className="absolute top-4 right-4 flex gap-2">
                 <button
@@ -301,18 +307,32 @@ export default function ProductPage({ params }) {
             </div>
 
             {/* Thumbnails */}
-            <div className="flex gap-2 mb-8">
-              {[0, 1, 2, 3].map((i) => (
-                <button
-                  key={i}
-                  className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center bg-white transition-colors ${
-                    i === 0 ? "border-[#111]" : "border-[#e2ddd6] hover:border-[#999]"
-                  }`}
-                >
-                  <Package size={18} className="text-[#ddd]" />
-                </button>
-              ))}
-            </div>
+            {product.images?.length > 0 ? (
+              <div className="flex gap-2 mb-8">
+                {product.images.map((img, i) => (
+                  <button
+                    key={img + i}
+                    onClick={() => setActiveImage(i)}
+                    className={`w-16 h-16 rounded-xl border-2 overflow-hidden bg-white transition-colors ${
+                      i === activeImage ? "border-[#111]" : "border-[#e2ddd6] hover:border-[#999]"
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-2 mb-8">
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="w-16 h-16 rounded-xl border-2 border-[#e2ddd6] flex items-center justify-center bg-white"
+                  >
+                    <Package size={18} className="text-[#ddd]" />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="bg-white border border-[#e2ddd6] rounded-2xl overflow-hidden">

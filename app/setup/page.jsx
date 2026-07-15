@@ -18,9 +18,11 @@ create table if not exists public.products (
   status text default 'active' check (status in ('active', 'draft', 'out_of_stock')),
   features text[] default array[]::text[],
   specs jsonb default '{}'::jsonb,
+  images jsonb default '[]'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+alter table public.products add column if not exists images jsonb default '[]'::jsonb;
 alter table public.products enable row level security;
 create policy "vendors_manage_own" on public.products
   for all to authenticated using (auth.uid() = vendor_id)

@@ -9,6 +9,7 @@ import {
   LogOut, Plus, Upload, ArrowUpRight,
   TrendingUp, Eye, ChevronRight, Search, X,
   Trash2, Store, Loader2, AlertTriangle, Landmark, CheckCircle2, ExternalLink,
+  ImagePlus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
@@ -133,6 +134,7 @@ export default function VendorDashboard() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [images, setImages] = useState([]); // [{ id, preview, url, uploading, error }]
 
   async function loadProducts(u) {
     setProductsLoading(true);
@@ -267,7 +269,41 @@ export default function VendorDashboard() {
   const openAddProduct = () => {
     setForm(emptyForm);
     setSaveError(null);
+    setImages([]);
     setShowAddProduct(true);
+  };
+
+  const handleImageSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow re-selecting the same file
+    if (files.length === 0) return;
+
+    const newEntries = files.map(file => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      preview: URL.createObjectURL(file),
+      url: null,
+      uploading: true,
+      error: null,
+    }));
+    setImages(prev => [...prev, ...newEntries]);
+
+    await Promise.all(files.map(async (file, i) => {
+      const entry = newEntries[i];
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/products/upload-image", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Upload failed");
+        setImages(prev => prev.map(img => img.id === entry.id ? { ...img, url: data.url, uploading: false } : img));
+      } catch (err) {
+        setImages(prev => prev.map(img => img.id === entry.id ? { ...img, uploading: false, error: err.message } : img));
+      }
+    }));
+  };
+
+  const removeImage = (id) => {
+    setImages(prev => prev.filter(img => img.id !== id));
   };
 
   const handleSaveProduct = async () => {
@@ -286,6 +322,7 @@ export default function VendorDashboard() {
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       stock: form.stock ? parseInt(form.stock, 10) : 0,
       status: parseInt(form.stock || "0", 10) === 0 ? "out_of_stock" : "active",
+      images: images.filter(img => img.url).map(img => img.url),
     };
 
     const { data, error } = await supabase.from("products").insert(payload).select().single();
@@ -298,6 +335,7 @@ export default function VendorDashboard() {
 
     setProducts(prev => [data, ...prev]);
     setForm(emptyForm);
+    setImages([]);
     setShowAddProduct(false);
     setSaving(false);
   };
@@ -519,7 +557,13 @@ export default function VendorDashboard() {
                         <tr key={p.id} className="hover:bg-gray-50/80 transition-colors">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0"><Package size={14} className="text-gray-400" /></div>
+                              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                {p.images?.[0] ? (
+                                  <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package size={14} className="text-gray-400" />
+                                )}
+                              </div>
                               <div className="min-w-0">
                                 <div className="font-medium text-black truncate max-w-[180px]">{p.name}</div>
                                 <div className="text-[10px] text-gray-400 font-mono">{p.id.slice(0, 8)}…</div>
@@ -927,6 +971,43 @@ export default function VendorDashboard() {
                   placeholder="Describe your product…"
                 />
               </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 block mb-1.5">Photos</label>
+                <div className="flex flex-wrap gap-2">
+                  {images.map((img) => (
+                    <div key={img.id} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-50">
+                      <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                      {img.uploading && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Loader2 size={14} className="text-white animate-spin" />
+                        </div>
+                      )}
+                      {img.error && (
+                        <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
+                          <AlertTriangle size={14} className="text-white" />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeImage(img.id)}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                  <label className="w-16 h-16 rounded-xl border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-400 hover:text-gray-600 cursor-pointer flex-shrink-0 transition-colors">
+                    <ImagePlus size={16} />
+                    <span className="text-[9px] font-medium">Add</span>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={handleImageSelect} className="hidden" />
+                  </label>
+                </div>
+                {images.some(img => img.error) && (
+                  <p className="text-[11px] text-red-500 mt-1.5">Some images failed to upload — remove and try again.</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1.5">PNG, JPEG, WEBP or GIF · up to 5MB each</p>
+              </div>
             </div>
 
             <div className="flex gap-3 p-5 border-t border-gray-200 flex-shrink-0">
@@ -938,7 +1019,7 @@ export default function VendorDashboard() {
               </button>
               <button
                 onClick={handleSaveProduct}
-                disabled={saving || !form.name.trim() || !form.price}
+                disabled={saving || !form.name.trim() || !form.price || images.some(img => img.uploading)}
                 className="flex-1 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save product"}

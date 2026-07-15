@@ -137,8 +137,12 @@ export default function CheckoutPage() {
               <div className="divide-y divide-[#f0ede8]">
                 {items.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 px-5 py-4">
-                    <div className="w-12 h-12 rounded-lg bg-[#f5f3ef] border border-[#e2ddd6] flex items-center justify-center flex-shrink-0">
-                      <Package size={16} className="text-[#ccc]" />
+                    <div className="w-12 h-12 rounded-lg bg-[#f5f3ef] border border-[#e2ddd6] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {item.images?.[0] ? (
+                        <img src={item.images[0]} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={16} className="text-[#ccc]" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-[#111] truncate">{item.name}</div>

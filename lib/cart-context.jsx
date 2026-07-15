@@ -38,6 +38,7 @@ export function CartProvider({ children }) {
         original_price: product.original_price ? parseFloat(product.original_price) : null,
         vendor_id: product.vendor_id || null,
         vendor_name: product.vendor_name || "Marketplace Seller",
+        images: Array.isArray(product.images) ? product.images : [],
         qty,
       }];
     });

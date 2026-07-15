@@ -55,15 +55,25 @@ const ProductCard = ({ product }) => {
       whileHover={{ y: -8, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}
     >
       <div className="relative h-52 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center overflow-hidden">
-        <motion.div
-          animate={{ 
-            scale: isHovered ? 1.1 : 1,
-            rotate: isHovered ? 3 : 0
-          }}
-          transition={{ duration: 0.4 }}
-        >
-          <Package size={50} className="text-gray-300 group-hover:text-gray-400 transition-colors duration-300" />
-        </motion.div>
+        {product.images?.[0] ? (
+          <motion.img
+            src={product.images[0]}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            animate={{ scale: isHovered ? 1.06 : 1 }}
+            transition={{ duration: 0.4 }}
+          />
+        ) : (
+          <motion.div
+            animate={{ 
+              scale: isHovered ? 1.1 : 1,
+              rotate: isHovered ? 3 : 0
+            }}
+            transition={{ duration: 0.4 }}
+          >
+            <Package size={50} className="text-gray-300 group-hover:text-gray-400 transition-colors duration-300" />
+          </motion.div>
+        )}
         
         {discount !== "0" && (
           <motion.span 
