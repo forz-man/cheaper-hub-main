@@ -559,7 +559,7 @@ export default function VendorDashboard() {
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                                 {p.images?.[0] ? (
-                                  <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
+                                  <img src={p.images[0]} alt="" className="w-full h-full object-contain p-0.5" />
                                 ) : (
                                   <Package size={14} className="text-gray-400" />
                                 )}
@@ -977,7 +977,7 @@ export default function VendorDashboard() {
                 <div className="flex flex-wrap gap-2">
                   {images.map((img) => (
                     <div key={img.id} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-50">
-                      <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                      <img src={img.preview} alt="" className="w-full h-full object-contain p-1" />
                       {img.uploading && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                           <Loader2 size={14} className="text-white animate-spin" />

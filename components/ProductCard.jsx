@@ -59,7 +59,7 @@ const ProductCard = ({ product }) => {
           <motion.img
             src={product.images[0]}
             alt={product.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain p-4"
             animate={{ scale: isHovered ? 1.06 : 1 }}
             transition={{ duration: 0.4 }}
           />

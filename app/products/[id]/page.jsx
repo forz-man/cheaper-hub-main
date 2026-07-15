@@ -282,7 +282,7 @@ export default function ProductPage({ params }) {
               )}
               <div className="flex items-center justify-center h-[340px] sm:h-[420px] bg-[#f9f8f6] overflow-hidden">
                 {product.images?.[activeImage] ? (
-                  <img src={product.images[activeImage]} alt={product.name} className="w-full h-full object-cover" />
+                  <img src={product.images[activeImage]} alt={product.name} className="w-full h-full object-contain p-6" />
                 ) : (
                   <Package size={72} className="text-[#ddd]" />
                 )}
@@ -317,7 +317,7 @@ export default function ProductPage({ params }) {
                       i === activeImage ? "border-[#111]" : "border-[#e2ddd6] hover:border-[#999]"
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img src={img} alt="" className="w-full h-full object-contain p-1.5" />
                   </button>
                 ))}
               </div>

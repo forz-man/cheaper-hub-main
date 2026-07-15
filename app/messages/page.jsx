@@ -362,7 +362,14 @@ function MessagesPageInner() {
                             </div>
                             {conv.product?.name && (
                               <p className="text-[10px] text-gray-400 truncate mb-0.5 flex items-center gap-1">
-                                <Package size={9} className="flex-shrink-0" /> {conv.product.name}
+                                {conv.product?.images?.[0] ? (
+                                  <span className="w-3.5 h-3.5 rounded bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                    <img src={conv.product.images[0]} alt="" className="w-full h-full object-contain" />
+                                  </span>
+                                ) : (
+                                  <Package size={9} className="flex-shrink-0" />
+                                )}
+                                {conv.product.name}
                               </p>
                             )}
                             <p className="text-xs text-gray-400 truncate">
@@ -409,7 +416,13 @@ function MessagesPageInner() {
                         {selectedConv.product_id && (
                           <Link href={`/products/${selectedConv.product_id}`}
                             className="text-xs text-gray-400 border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 hover:text-black transition-all flex items-center gap-1.5 hidden sm:flex">
-                            <Package size={11} />
+                            {selectedConv.product?.images?.[0] ? (
+                              <span className="w-4 h-4 rounded bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                <img src={selectedConv.product.images[0]} alt="" className="w-full h-full object-contain" />
+                              </span>
+                            ) : (
+                              <Package size={11} />
+                            )}
                             <span className="max-w-[100px] truncate">{selectedConv.product?.name || "Product"}</span>
                           </Link>
                         )}
@@ -425,8 +438,12 @@ function MessagesPageInner() {
                       {/* Product context card */}
                       {selectedConv.product_id && (
                         <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-4 flex items-center gap-3 shadow-sm">
-                          <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Package size={16} className="text-gray-300" />
+                          <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {selectedConv.product?.images?.[0] ? (
+                              <img src={selectedConv.product.images[0]} alt="" className="w-full h-full object-contain" />
+                            ) : (
+                              <Package size={16} className="text-gray-300" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-black truncate">{selectedConv.product?.name || "Product"}</p>

@@ -165,7 +165,7 @@ export async function GET(request) {
       try {
         const { data: products } = await supabase
           .from("products")
-          .select("id, name, price, vendor_name, vendor_id")
+          .select("id, name, price, vendor_name, vendor_id, images")
           .in("id", productIds);
         if (products) {
           for (const p of products) productMap[p.id] = p;

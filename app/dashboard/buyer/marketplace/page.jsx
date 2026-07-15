@@ -274,7 +274,7 @@ export default function MarketplacePage() {
                 <div key={product.id} className="bg-white border border-[#e2ddd6] rounded-xl overflow-hidden hover:border-[#999] hover:shadow-md transition-all flex flex-col">
                   <div className="h-36 bg-[#f9f8f6] relative flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {product.images?.[0] ? (
-                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain p-3" />
                     ) : (
                       <Package size={30} className="text-[#ddd]" />
                     )}
