@@ -73,7 +73,7 @@ export default function MarketplacePage() {
     setProductsLoading(true);
     let q = supabase
       .from("products")
-      .select("id, name, vendor_name, price, original_price, category, stock, status")
+      .select("id, name, vendor_name, price, original_price, category, stock, status, images")
       .eq("status", "active");
 
     if (search.trim()) {
