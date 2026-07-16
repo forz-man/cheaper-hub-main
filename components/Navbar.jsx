@@ -178,7 +178,6 @@ export default function Navbar() {
     { label: "Home",        href: "/",           icon: Home,         id: "home"        },
     { label: "Marketplace", href: "/marketplace", icon: Package,      id: "marketplace" },
     { label: "Deals",       href: "/deals",       icon: BadgePercent, id: "deals"       },
-    ...(!user ? [{ label: "Sell", href: "/sell", icon: Store, id: "sell" }] : []),
     { label: "Contact",     href: "/contact",     icon: Megaphone,    id: "contact"     },
   ];
 
