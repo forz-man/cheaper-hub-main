@@ -63,7 +63,7 @@ function RegisterForm() {
         title={`Create ${roleLabel} Account`}
         subtitle="Join Cheaper — it's free and takes 2 minutes."
       >
-        <SocialLoginButtons />
+        <SocialLoginButtons role={role} />
 
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-[#e2ddd6]" />

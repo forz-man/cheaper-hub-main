@@ -21,14 +21,14 @@ function AppleIcon() {
   );
 }
 
-export default function SocialLoginButtons() {
+export default function SocialLoginButtons({ role }) {
   const handleGoogle = async () => {
-    const { error } = await loginWithGoogle();
+    const { error } = await loginWithGoogle(role);
     if (error) console.error("Google login error:", error.message);
   };
 
   const handleApple = async () => {
-    const { error } = await loginWithApple();
+    const { error } = await loginWithApple(role);
     if (error) console.error("Apple login error:", error.message);
   };
 

@@ -67,6 +67,9 @@ export async function GET(request) {
     return NextResponse.redirect(new URL("/login", origin));
   }
 
+  // Role the user chose before OAuth (encoded in the redirectTo URL)
+  const pendingRole = requestUrl.searchParams.get("role");
+
   let role = resolveUserRole(user, null);
 
   if (!role) {
@@ -78,6 +81,19 @@ export async function GET(request) {
         .single();
       role = resolveUserRole(user, profile?.role);
     } catch {}
+  }
+
+  // Brand-new OAuth user with no role yet — apply the one they chose
+  if (!role && pendingRole) {
+    try {
+      await supabase.auth.updateUser({ data: { role: pendingRole } });
+      await supabase
+        .from("profiles")
+        .upsert({ id: user.id, role: pendingRole }, { onConflict: "id" });
+      role = pendingRole;
+    } catch (err) {
+      console.error("[auth/callback] Failed to apply pending role:", err);
+    }
   }
 
   return NextResponse.redirect(new URL(destinationForRole(role), origin));
