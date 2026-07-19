@@ -79,6 +79,7 @@ function MarketplaceContent() {
     let q = supabase
       .from("products")
       .select("id, name, vendor_name, price, original_price, category, stock, status, images")
+      .eq("approval_status", "approved")
       .eq("status", "active");
 
     if (searchQuery.trim()) {

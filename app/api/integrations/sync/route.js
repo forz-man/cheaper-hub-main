@@ -65,6 +65,7 @@ export async function POST(request) {
       original_price:  parseFloat(p.original_price) || null,
       stock:           p.stock ?? null,
       status:          (p.stock === 0) ? "out_of_stock" : "active",
+      approval_status: "pending",
       category:        p.category || "Uncategorised",
       images:          p.images || [],
       external_id:     String(p.external_id),

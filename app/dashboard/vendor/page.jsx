@@ -25,6 +25,12 @@ const statusConfig = {
   draft: { label: "Draft", color: "text-gray-500 bg-gray-50 border-gray-200" },
 };
 
+const approvalConfig = {
+  pending: { label: "Pending", color: "text-amber-700 bg-amber-50 border-amber-100" },
+  approved: { label: "Approved", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+  rejected: { label: "Rejected", color: "text-red-700 bg-red-50 border-red-100" },
+};
+
 const payoutConfig = {
   pending: { label: "Held by platform", color: "text-amber-700 bg-amber-50 border-amber-100" },
   released: { label: "Released to you", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
@@ -553,6 +559,7 @@ export default function VendorDashboard() {
                         <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Price</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Stock</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                        <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Approval</th>
                         <th className="px-5 py-3.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
@@ -581,6 +588,18 @@ export default function VendorDashboard() {
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(statusConfig[p.status] || statusConfig.active).color}`}>
                               {(statusConfig[p.status] || statusConfig.active).label}
                             </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(approvalConfig[p.approval_status] || approvalConfig.pending).color}`}>
+                                {(approvalConfig[p.approval_status] || approvalConfig.pending).label}
+                              </span>
+                              {p.approval_status === "pending" && (
+                                <span className="text-[9px] text-amber-600 leading-tight max-w-[120px]">
+                                  Waiting for admin approval
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex items-center justify-end gap-1.5">

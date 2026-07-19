@@ -13,6 +13,7 @@ create table if not exists public.products (
   original_price numeric(10,2),
   stock integer default 0 not null,
   status text default 'active' check (status in ('active', 'draft', 'out_of_stock')),
+  approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
   features text[] default array[]::text[],
   specs jsonb default '{}'::jsonb,
   images jsonb default '[]'::jsonb,
@@ -36,16 +37,39 @@ create unique index if not exists products_vendor_external_platform_idx
   on public.products(vendor_id, external_id, source_platform)
   where external_id is not null and source_platform is not null;
 
+create index if not exists products_approval_status_idx
+  on public.products(approval_status);
+
 alter table public.products enable row level security;
 
-create policy "vendors_manage_own" on public.products
-  for all to authenticated
+create policy "vendor_insert_own" on public.products
+  for insert to authenticated
+  with check (auth.uid() = vendor_id);
+
+create policy "vendor_select_own" on public.products
+  for select to authenticated
+  using (auth.uid() = vendor_id);
+
+create policy "vendor_update_own" on public.products
+  for update to authenticated
   using (auth.uid() = vendor_id)
   with check (auth.uid() = vendor_id);
 
-create policy "public_read_active" on public.products
+create policy "vendor_delete_own" on public.products
+  for delete to authenticated
+  using (auth.uid() = vendor_id);
+
+create policy "public_read_approved" on public.products
   for select
-  using (status = 'active' or auth.uid() = vendor_id);
+  using (approval_status = 'approved' and status = 'active');
+
+-- Column-level: only service_role can update approval_status
+revoke update on public.products from authenticated;
+grant update (
+  vendor_name, name, description, category, price, original_price,
+  stock, status, features, specs, images,
+  external_id, source_platform, source_url, updated_at
+) on public.products to authenticated;
 
 -- ── Orders ────────────────────────────────────────────────────────────────────
 create table if not exists public.orders (
@@ -354,3 +378,178 @@ alter table public.contact_messages enable row level security;
 create policy "contact_messages_public_insert" on public.contact_messages
   for insert to anon, authenticated
   with check (true);
+
+-- ── Notifications ──────────────────────────────────────────────────────────────
+-- Structured notifications for product approvals, order updates, and system events.
+-- Enables real-time push to the notification bell/dropdown and full notification page.
+create table if not exists public.notifications (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  type text not null check (type in (
+    'product_pending', 'product_approved', 'product_rejected',
+    'order_update', 'payout_release', 'system'
+  )),
+  title text not null,
+  body text,
+  link text,                          -- href to navigate when clicked
+  data jsonb default '{}'::jsonb,     -- extra payload (product_id, vendor_id, reason, etc.)
+  is_read boolean default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists notifications_user_id_idx on public.notifications(user_id);
+create index if not exists notifications_is_read_idx on public.notifications(is_read);
+create index if not exists notifications_created_at_idx on public.notifications(created_at desc);
+
+alter table public.notifications enable row level security;
+
+-- Users can read their own notifications
+create policy "notifications_user_select" on public.notifications
+  for select to authenticated
+  using (auth.uid() = user_id);
+
+-- Service role (admin API) can insert for any user
+create policy "notifications_service_insert" on public.notifications
+  for insert to authenticated
+  with check (true);
+
+-- Users can update their own notifications (mark read/unread)
+create policy "notifications_user_update" on public.notifications
+  for update to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Users can delete their own notifications
+create policy "notifications_user_delete" on public.notifications
+  for delete to authenticated
+  using (auth.uid() = user_id);
+
+-- Enable realtime for notifications
+alter publication supabase_realtime add table public.notifications;
+
+-- ── Activity logs ─────────────────────────────────────────────────────────────
+-- Audit trail for admin actions (approve/reject products, manage users, etc.)
+create table if not exists public.activity_logs (
+  id uuid default gen_random_uuid() primary key,
+  actor_id uuid references auth.users(id) on delete set null,
+  action text not null,
+  entity_type text not null,           -- 'product', 'user', 'order', 'vendor'
+  entity_id text,                      -- the affected entity's id
+  description text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists activity_logs_actor_idx on public.activity_logs(actor_id);
+create index if not exists activity_logs_created_at_idx on public.activity_logs(created_at desc);
+
+alter table public.activity_logs enable row level security;
+
+-- Admin can read all activity logs
+create policy "activity_logs_admin_select" on public.activity_logs
+  for select to authenticated
+  using (true);
+
+-- Service role can insert
+create policy "activity_logs_service_insert" on public.activity_logs
+  for insert to authenticated
+  with check (true);
+
+-- ── Add product approval columns (safe to re-run) ─────────────────────────────
+alter table public.products add column if not exists approved_at timestamptz;
+alter table public.products add column if not exists approved_by uuid references auth.users(id);
+alter table public.products add column if not exists rejected_at timestamptz;
+alter table public.products add column if not exists rejected_by uuid references auth.users(id);
+alter table public.products add column if not exists rejection_reason text;
+
+-- ── Trigger: notify admins when vendor submits a new pending product ───────────
+create or replace function public.notify_admins_on_pending_product()
+returns trigger as $$
+begin
+  if new.approval_status = 'pending' then
+    insert into public.notifications (user_id, type, title, body, link, data)
+    select
+      p.id,
+      'product_pending',
+      'New product submitted',
+      'Product: ' || new.name || E'\nVendor: ' || coalesce(new.vendor_name, 'Unknown'),
+      '/dashboard/admin?section=products&tab=pending',
+      jsonb_build_object('product_id', new.id, 'vendor_id', new.vendor_id)
+    from public.profiles p
+    where p.role = 'admin';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_product_insert_pending on public.products;
+create trigger on_product_insert_pending
+  after insert on public.products
+  for each row
+  execute function public.notify_admins_on_pending_product();
+
+-- ── Trigger: notify admins when existing product changes to pending ────────────
+create or replace function public.notify_admins_on_pending_update()
+returns trigger as $$
+begin
+  if new.approval_status = 'pending' and old.approval_status != 'pending' then
+    insert into public.notifications (user_id, type, title, body, link, data)
+    select
+      p.id,
+      'product_pending',
+      'Product resubmitted',
+      'Product: ' || new.name || E'\nVendor: ' || coalesce(new.vendor_name, 'Unknown'),
+      '/dashboard/admin?section=products&tab=pending',
+      jsonb_build_object('product_id', new.id, 'vendor_id', new.vendor_id)
+    from public.profiles p
+    where p.role = 'admin';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_product_update_pending on public.products;
+create trigger on_product_update_pending
+  after update on public.products
+  for each row
+  when (new.approval_status = 'pending' and old.approval_status != 'pending')
+  execute function public.notify_admins_on_pending_update();
+
+-- ── Reviews ──────────────────────────────────────────────────────────────────
+-- Buyers can leave one review per product after a delivered purchase.
+-- rating: 1–5 integer enforced by CHECK constraint.
+-- order_item_id links to the specific delivered item (purchase proof).
+create table if not exists public.reviews (
+  id uuid default gen_random_uuid() primary key,
+  product_id uuid references public.products(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  order_item_id uuid references public.order_items(id) on delete set null,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  text text,
+  created_at timestamptz default now(),
+  unique(user_id, product_id)
+);
+
+alter table public.reviews enable row level security;
+
+-- Anyone can read reviews (shown on product pages)
+create policy "reviews_public_read" on public.reviews
+  for select to anon, authenticated
+  using (true);
+
+-- Authenticated users can insert their own reviews.
+-- Purchase verification is enforced in the API layer (service role).
+-- RLS prevents inserting on behalf of another user.
+create policy "reviews_insert_own" on public.reviews
+  for insert to authenticated
+  with check (auth.uid() = user_id);
+
+-- Users can update/delete their own reviews
+create policy "reviews_update_own" on public.reviews
+  for update to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "reviews_delete_own" on public.reviews
+  for delete to authenticated
+  using (auth.uid() = user_id);
