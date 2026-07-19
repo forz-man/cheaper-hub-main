@@ -129,16 +129,91 @@ export default function BuyerDashboard() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersFilter, setOrdersFilter] = useState("all");
 
+  const [reviewEligibility, setReviewEligibility] = useState({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewModalProduct, setReviewModalProduct] = useState(null);
+  const [reviewFormRating, setReviewFormRating] = useState(0);
+  const [reviewFormText, setReviewFormText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitError, setReviewSubmitError] = useState("");
+
   async function loadOrders(uid) {
     setOrdersLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, status, total, created_at, order_items(product_name, vendor_name, qty, price)")
+      .select("id, status, total, created_at, order_items(id, product_id, product_name, vendor_name, qty, price)")
       .eq("buyer_id", uid)
       .order("created_at", { ascending: false });
 
-    if (!error && data) setOrders(data);
+    if (!error && data) {
+      setOrders(data);
+      checkReviewEligibility(data);
+    }
     setOrdersLoading(false);
+  }
+
+  async function checkReviewEligibility(orders) {
+    const productIds = new Set();
+    for (const order of orders) {
+      if (order.status !== "delivered" || !order.order_items) continue;
+      for (const item of order.order_items) {
+        if (item.product_id) productIds.add(item.product_id);
+      }
+    }
+    if (productIds.size === 0) return;
+
+    const loadingMap = {};
+    for (const pid of productIds) loadingMap[pid] = { canReview: false, loading: true };
+    setReviewEligibility(prev => ({ ...prev, ...loadingMap }));
+
+    const results = await Promise.all(
+      [...productIds].map(async (pid) => {
+        try {
+          const res = await fetch(`/api/reviews/eligibility?product_id=${pid}`);
+          if (res.ok) {
+            const data = await res.json();
+            return [pid, { ...data, loading: false }];
+          }
+        } catch {}
+        return [pid, { canReview: false, loading: false }];
+      })
+    );
+    setReviewEligibility(prev => ({ ...prev, ...Object.fromEntries(results) }));
+  }
+
+  function openReviewModal(item) {
+    setReviewModalProduct(item);
+    setReviewFormRating(0);
+    setReviewFormText("");
+    setReviewSubmitError("");
+    setReviewModalOpen(true);
+  }
+
+  async function handleSubmitReview() {
+    if (!reviewModalProduct || reviewFormRating < 1) return;
+    setReviewSubmitting(true);
+    setReviewSubmitError("");
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: reviewModalProduct.product_id, rating: reviewFormRating, text: reviewFormText.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setReviewSubmitError(err.error || "Failed to submit review");
+        return;
+      }
+      setReviewModalOpen(false);
+      setReviewEligibility(prev => ({
+        ...prev,
+        [reviewModalProduct.product_id]: { canReview: false, existingReview: { rating: reviewFormRating }, loading: false },
+      }));
+    } catch {
+      setReviewSubmitError("Something went wrong. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
+    }
   }
 
   useEffect(() => {
@@ -365,11 +440,23 @@ export default function BuyerDashboard() {
                                 )}
                               </div>
                               <div className="text-xs text-gray-400 mt-0.5">{firstItem?.vendor_name || "Marketplace"}</div>
-                              <div className="flex items-center gap-2 mt-2">
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${sc.color}`}>
                                   <StatusIcon size={10} /> {sc.label}
                                 </span>
                                 <span className="text-[10px] text-gray-300">{formatDate(order.created_at)}</span>
+                                {order.status === "delivered" && firstItem?.product_id && reviewEligibility[firstItem.product_id] && !reviewEligibility[firstItem.product_id].loading && (
+                                  reviewEligibility[firstItem.product_id].canReview ? (
+                                    <button onClick={() => openReviewModal(firstItem)}
+                                      className="text-[10px] font-semibold text-white bg-black px-2.5 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap">
+                                      Give Review
+                                    </button>
+                                  ) : reviewEligibility[firstItem.product_id].existingReview ? (
+                                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                      Reviewed
+                                    </span>
+                                  ) : null
+                                )}
                               </div>
                             </div>
                           </div>
@@ -383,7 +470,21 @@ export default function BuyerDashboard() {
                             {order.order_items.slice(1).map((item, i) => (
                               <div key={i} className="flex items-center justify-between text-xs text-gray-400">
                                 <span className="truncate">{item.product_name} × {item.qty}</span>
-                                <span className="flex-shrink-0 ml-4">${parseFloat(item.price * item.qty).toFixed(2)}</span>
+                                <span className="flex items-center gap-2 flex-shrink-0 ml-4">
+                                  <span>${parseFloat(item.price * item.qty).toFixed(2)}</span>
+                                  {order.status === "delivered" && item.product_id && reviewEligibility[item.product_id] && !reviewEligibility[item.product_id].loading && (
+                                    reviewEligibility[item.product_id].canReview ? (
+                                      <button onClick={() => openReviewModal(item)}
+                                        className="text-[10px] font-semibold text-white bg-black px-2 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap">
+                                        Give Review
+                                      </button>
+                                    ) : reviewEligibility[item.product_id].existingReview ? (
+                                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                        Reviewed
+                                      </span>
+                                    ) : null
+                                  )}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -498,6 +599,68 @@ export default function BuyerDashboard() {
 
         </AnimatePresence>
       </div>
+
+      {/* ── Review Modal ──────────────────────────────────────────── */}
+      {reviewModalOpen && reviewModalProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setReviewModalOpen(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10"
+          >
+            <button onClick={() => setReviewModalOpen(false)} className="absolute top-4 right-4 text-gray-300 hover:text-black transition-colors">
+              <X size={16} />
+            </button>
+            <h3 className="text-base font-bold text-black mb-1" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+              Review product
+            </h3>
+            <p className="text-xs text-gray-400 mb-4">{reviewModalProduct.product_name}</p>
+
+            {/* Star rating */}
+            <div className="flex items-center gap-1 mb-4">
+              {[1,2,3,4,5].map(s => (
+                <button key={s} type="button" onClick={() => setReviewFormRating(s)} className="p-0.5 transition-transform hover:scale-110">
+                  <Star size={22} className={s <= reviewFormRating ? "text-amber-500 fill-amber-500" : "text-gray-200"} />
+                </button>
+              ))}
+              {reviewFormRating > 0 && (
+                <span className="text-xs text-gray-400 ml-2">
+                  {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][reviewFormRating]}
+                </span>
+              )}
+            </div>
+
+            {/* Comment */}
+            <textarea
+              value={reviewFormText}
+              onChange={(e) => setReviewFormText(e.target.value)}
+              placeholder="Share your experience with this product..."
+              maxLength={2000}
+              rows={3}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white resize-none focus:outline-none focus:border-gray-400 transition-colors"
+            />
+            {reviewSubmitError && (
+              <p className="text-xs text-red-500 mt-1.5">{reviewSubmitError}</p>
+            )}
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-[10px] text-gray-300">{reviewFormText.length}/2000</span>
+              <button
+                onClick={handleSubmitReview}
+                disabled={reviewSubmitting || reviewFormRating < 1}
+                className="bg-black text-white px-5 py-2 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {reviewSubmitting ? (
+                  <><Loader2 size={12} className="animate-spin" /> Submitting...</>
+                ) : (
+                  "Submit review"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

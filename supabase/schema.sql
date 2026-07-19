@@ -192,15 +192,16 @@ create policy "profiles_own_write" on public.profiles
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- Auto-create profile on sign-up
+-- Auto-create profile on sign-up (includes role sync from user_metadata)
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, email)
+  insert into public.profiles (id, full_name, email, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-    new.email
+    new.email,
+    nullif(new.raw_user_meta_data->>'role', '')
   )
   on conflict (id) do nothing;
   return new;
@@ -408,10 +409,10 @@ create policy "notifications_user_select" on public.notifications
   for select to authenticated
   using (auth.uid() = user_id);
 
--- Service role (admin API) can insert for any user
-create policy "notifications_service_insert" on public.notifications
+-- Admin users can insert for any user (service_role bypasses RLS entirely)
+create policy "notifications_admin_insert" on public.notifications
   for insert to authenticated
-  with check (true);
+  with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
 -- Users can update their own notifications (mark read/unread)
 create policy "notifications_user_update" on public.notifications
@@ -450,10 +451,10 @@ create policy "activity_logs_admin_select" on public.activity_logs
   for select to authenticated
   using (true);
 
--- Service role can insert
-create policy "activity_logs_service_insert" on public.activity_logs
+-- Admin users can insert (service_role bypasses RLS entirely)
+create policy "activity_logs_admin_insert" on public.activity_logs
   for insert to authenticated
-  with check (true);
+  with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
 -- ── Add product approval columns (safe to re-run) ─────────────────────────────
 alter table public.products add column if not exists approved_at timestamptz;
@@ -553,3 +554,74 @@ create policy "reviews_update_own" on public.reviews
 create policy "reviews_delete_own" on public.reviews
   for delete to authenticated
   using (auth.uid() = user_id);
+
+-- ── Backfill: sync role from auth.users metadata into profiles ───────────────
+-- Existing users who signed up before the trigger was updated will have
+-- profiles.role = NULL. This one-time update copies the role from the
+-- auth.users raw_user_meta_data into the profiles table.
+-- Safe to re-run (idempotent).
+update public.profiles p
+set role = u.raw_user_meta_data->>'role'
+from auth.users u
+where p.id = u.id
+  and p.role is null
+  and u.raw_user_meta_data->>'role' is not null;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- ADMIN DASHBOARD PRODUCTION AUDIT MIGRATIONS (July 2026)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ── Profiles: soft-delete and suspension columns ─────────────────────────────
+alter table public.profiles add column if not exists suspended boolean default false;
+alter table public.profiles add column if not exists suspended_at timestamptz;
+alter table public.profiles add column if not exists suspended_by uuid references auth.users(id);
+alter table public.profiles add column if not exists deleted boolean default false;
+alter table public.profiles add column if not exists deleted_at timestamptz;
+alter table public.profiles add column if not exists deleted_by uuid references auth.users(id);
+alter table public.profiles add column if not exists updated_at timestamptz default now();
+
+-- ── Settings table ───────────────────────────────────────────────────────────
+create table if not exists public.settings (
+  key text primary key,
+  value text not null default '',
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz default now()
+);
+
+alter table public.settings enable row level security;
+
+-- Only admins can read/write settings (service_role bypasses RLS for admin API)
+create policy "settings_admin_all" on public.settings
+  for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+  with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- Default settings
+insert into public.settings (key, value) values
+  ('platform_name', 'Cheaper'),
+  ('support_email', 'support@cheaper.com'),
+  ('commission_rate', '10'),
+  ('platform_fee', '0'),
+  ('currency', 'USD'),
+  ('contact_number', ''),
+  ('maintenance_mode', 'false'),
+  ('tax_rate', '0'),
+  ('shipping_flat_rate', '0'),
+  ('free_shipping_threshold', '100')
+on conflict (key) do nothing;
+
+-- ── Indexes for performance ──────────────────────────────────────────────────
+create index if not exists profiles_role_idx on public.profiles(role);
+create index if not exists profiles_suspended_idx on public.profiles(suspended);
+create index if not exists profiles_deleted_idx on public.profiles(deleted);
+create index if not exists profiles_email_idx on public.profiles(email);
+create index if not exists orders_status_idx on public.orders(status);
+create index if not exists orders_payment_status_idx on public.orders(payment_status);
+create index if not exists orders_buyer_id_idx on public.orders(buyer_id);
+create index if not exists order_items_vendor_id_idx on public.order_items(vendor_id);
+create index if not exists order_items_product_id_idx on public.order_items(product_id);
+create index if not exists contact_messages_status_idx on public.contact_messages(status);
+create index if not exists products_vendor_id_idx on public.products(vendor_id);
+create index if not exists products_status_idx on public.products(status);
+create index if not exists reviews_product_id_idx on public.reviews(product_id);
+create index if not exists reviews_user_id_idx on public.reviews(user_id);

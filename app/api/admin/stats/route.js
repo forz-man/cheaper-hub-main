@@ -1,27 +1,20 @@
-import { createClient } from "@/lib/server";
-import { createAdminClient } from "@/lib/supabaseAdmin";
+import { requireAdmin } from "@/lib/admin-auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { withSecurityHeaders } from "@/lib/secure-headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
+  const rl = rateLimit({ maxRequests: 30 });
+  const rlResult = rl({ headers: { get: () => null } });
+  if (rlResult.error) return rlResult.error;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
-
-    const admin = createAdminClient();
+    const { error, admin } = await requireAdmin();
+    if (error) return error;
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const [
       { count: totalProducts },
@@ -33,7 +26,6 @@ export async function GET() {
       { count: buyerCount },
       { count: pendingVendors },
       { count: todayOrders },
-      { count: activeUsers },
     ] = await Promise.all([
       admin.from("products").select("*", { count: "exact", head: true }),
       admin.from("products").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
@@ -44,7 +36,14 @@ export async function GET() {
       admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "buyer"),
       admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor").is("stripe_account_id", null),
       admin.from("orders").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
-      admin.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    ]);
+
+    const [
+      { count: activeUsers },
+      { count: refundRequests },
+    ] = await Promise.all([
+      admin.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", thirtyDaysAgo),
+      admin.from("orders").select("*", { count: "exact", head: true }).eq("payment_status", "refunded"),
     ]);
 
     const { data: revenueData } = await admin
@@ -52,7 +51,7 @@ export async function GET() {
       .select("total")
       .eq("payment_status", "paid");
 
-    const totalRevenue = (revenueData || []).reduce((s, o) => s + Number(o.total), 0);
+    const totalRevenue = (revenueData || []).reduce((s, o) => s + Number(o.total || 0), 0);
 
     const { data: todayRevenueData } = await admin
       .from("orders")
@@ -60,21 +59,16 @@ export async function GET() {
       .eq("payment_status", "paid")
       .gte("created_at", todayStart);
 
-    const todayRevenue = (todayRevenueData || []).reduce((s, o) => s + Number(o.total), 0);
+    const todayRevenue = (todayRevenueData || []).reduce((s, o) => s + Number(o.total || 0), 0);
 
     const { data: lowStockData } = await admin
       .from("products")
-      .select("id")
+      .select("id", { count: false, head: false })
       .eq("status", "active")
       .eq("approval_status", "approved")
       .lte("stock", 5);
 
-    const { count: refundRequests } = await admin
-      .from("orders")
-      .select("*", { count: "exact", head: true })
-      .eq("payment_status", "refunded");
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       totalRevenue,
       todayRevenue,
       totalOrders: totalOrders || 0,
@@ -90,10 +84,11 @@ export async function GET() {
       lowStockCount: lowStockData?.length || 0,
       todayOrders: todayOrders || 0,
     });
+
+    return withSecurityHeaders(response);
   } catch (err) {
-    return NextResponse.json(
-      { message: err.message || "Internal Server Error" },
-      { status: 500 }
+    return withSecurityHeaders(
+      NextResponse.json({ message: "Internal server error" }, { status: 500 })
     );
   }
 }

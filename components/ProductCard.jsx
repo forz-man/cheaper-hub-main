@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Package, Star, Heart, Eye, ShoppingBag, TrendingUp, Sparkles, Zap, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { Package, Star, Heart, Eye, ShoppingBag, TrendingUp, Sparkles, Zap, ArrowRight, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useCart } from "@/lib/cart-context";
 
@@ -11,6 +11,21 @@ const ProductCard = ({ product }) => {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
+  const [dbRating, setDbRating] = useState(null);
+  const [dbReviewCount, setDbReviewCount] = useState(null);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    fetch(`/api/reviews?product_id=${product.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.stats) {
+          setDbRating(data.stats.average);
+          setDbReviewCount(data.stats.total);
+        }
+      })
+      .catch(() => {});
+  }, [product?.id]);
 
   const calculateDiscount = (price, originalPrice) => {
     if (!originalPrice || originalPrice === 0) return "0";
@@ -18,17 +33,9 @@ const ProductCard = ({ product }) => {
     return Math.round(discount).toString();
   };
 
-  const getRandomRating = () => {
-    return (3.5 + Math.random() * 1.5).toFixed(1);
-  };
-
-  const getRandomReviews = () => {
-    return Math.floor(Math.random() * 500) + 50;
-  };
-
   const discount = calculateDiscount(product.price, product.original_price);
-  const rating = product.rating || 4.5;
-  const reviews = product.reviews || 128;
+  const rating = dbRating ?? product.rating ?? 0;
+  const reviews = dbReviewCount ?? product.reviews ?? 0;
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
 

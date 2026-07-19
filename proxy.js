@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
-// Routes anyone can access without being logged in
 const PUBLIC_ROUTES = new Set([
   "/",
   "/login",
@@ -14,24 +13,30 @@ const PUBLIC_ROUTES = new Set([
   "/contact",
 ]);
 
+const ADMIN_ROUTES = [
+  "/dashboard/admin",
+  "/api/admin",
+  "/admin",
+];
+
+function isAdminRoute(pathname) {
+  return ADMIN_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
+}
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
-  // Always pass through API routes and static assets
   if (
-    pathname.startsWith("/api/") ||
     pathname.startsWith("/_next") ||
     pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|webp|css|js|woff|woff2|ttf)$/)
   ) {
     return NextResponse.next();
   }
 
-  // Public routes — no auth required
   if (PUBLIC_ROUTES.has(pathname)) {
     return NextResponse.next();
   }
 
-  // Everything else needs a valid session
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -55,14 +60,36 @@ export async function proxy(request) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
+    if (isAdminRoute(pathname)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ message: "Authentication required" }, { status: 401 });
+      }
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin route role check
+  if (isAdminRoute(pathname)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role !== "admin") {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ message: "Admin access required" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   return response;
@@ -70,10 +97,6 @@ export async function proxy(request) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except Next.js internals and static files.
-     * The proxy function itself filters to the right subset.
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

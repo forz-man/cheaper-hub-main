@@ -1,26 +1,17 @@
-import { createClient } from "@/lib/server";
-import { createAdminClient } from "@/lib/supabaseAdmin";
+import { requireAdmin, sanitizeSearchTerm, parsePagination } from "@/lib/admin-auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { withSecurityHeaders } from "@/lib/secure-headers";
+import { logActivity } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
-async function checkAdmin(supabase) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: NextResponse.json({ message: "Unauthorized" }, { status: 401 }) };
+const VALID_APPROVAL_STATUSES = ["pending", "approved", "rejected"];
+const VALID_PRODUCT_STATUSES = ["active", "draft", "out_of_stock"];
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    return { error: NextResponse.json({ message: "Forbidden" }, { status: 403 }) };
-  }
-
-  return { user };
-}
+const RATE_LIMIT = rateLimit({ maxRequests: 60 });
 
 async function createNotification({ user_id, type, title, body, link, data }) {
   try {
+    const { createAdminClient } = await import("@/lib/supabaseAdmin");
     const admin = createAdminClient();
     await admin.from("notifications").insert({
       user_id,
@@ -31,95 +22,85 @@ async function createNotification({ user_id, type, title, body, link, data }) {
       data: data || {},
       is_read: false,
     });
-  } catch (_) {
-    // Best effort - don't fail the main operation
-  }
-}
-
-async function logActivity({ actor_id, action, entity_type, entity_id, description, metadata }) {
-  try {
-    const admin = createAdminClient();
-    await admin.from("activity_logs").insert({
-      actor_id,
-      action,
-      entity_type,
-      entity_id,
-      description,
-      metadata: metadata || {},
-    });
-  } catch (_) {
+  } catch {
     // Best effort
   }
 }
 
 export async function GET(req) {
+  const rl = RATE_LIMIT(req);
+  if (rl.error) return rl.error;
+
   try {
-    const supabase = await createClient();
-    const auth = await checkAdmin(supabase);
-    if (auth.error) return auth.error;
+    const { error, admin } = await requireAdmin();
+    if (error) return error;
 
     const { searchParams } = new URL(req.url);
     const approvalStatusFilter = searchParams.get("approval_status");
     const status = searchParams.get("status");
-    const search = searchParams.get("q");
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
-    const offset = (page - 1) * limit;
+    const search = sanitizeSearchTerm(searchParams.get("q"));
+    const { page, limit, offset } = parsePagination(searchParams);
 
-    const admin = createAdminClient();
     let q = admin.from("products").select("*", { count: "exact" });
 
-    if (approvalStatusFilter && ["pending", "approved", "rejected"].includes(approvalStatusFilter)) {
+    if (approvalStatusFilter && VALID_APPROVAL_STATUSES.includes(approvalStatusFilter)) {
       q = q.eq("approval_status", approvalStatusFilter);
     }
 
-    if (status && ["active", "draft", "out_of_stock"].includes(status)) {
+    if (status && VALID_PRODUCT_STATUSES.includes(status)) {
       q = q.eq("status", status);
     }
 
-    if (search && search.trim()) {
-      const safe = search.trim().replace(/[%_'(),]/g, " ");
-      q = q.or(`name.ilike.%${safe}%,vendor_name.ilike.%${safe}%`);
+    if (search) {
+      q = q.or(`name.ilike.%${search}%,vendor_name.ilike.%${search}%`);
     }
 
-    const { data, error, count } = await q
+    const { data, error: dbError, count } = await q
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) {
-      return NextResponse.json({ message: error.message }, { status: 500 });
+    if (dbError) {
+      return NextResponse.json({ message: "Failed to fetch products" }, { status: 500 });
     }
 
-    return NextResponse.json({ products: data, total: count, page, limit }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { message: error.message || "Internal Server Error" },
-      { status: 500 }
+    const response = NextResponse.json({ products: data || [], total: count || 0, page, limit }, { status: 200 });
+    return withSecurityHeaders(response);
+  } catch {
+    return withSecurityHeaders(
+      NextResponse.json({ message: "Internal server error" }, { status: 500 })
     );
   }
 }
 
 export async function PATCH(req) {
+  const rl = RATE_LIMIT(req);
+  if (rl.error) return rl.error;
+
   try {
-    const supabase = await createClient();
-    const auth = await checkAdmin(supabase);
-    if (auth.error) return auth.error;
-    const adminUser = auth.user;
+    const { error: authError, admin, user: adminUser } = await requireAdmin();
+    if (authError) return authError;
 
-    const body = await req.json();
-    const { product_id, approval_status } = body;
-
-    if (!product_id || !approval_status) {
-      return NextResponse.json({ message: "product_id and approval_status are required" }, { status: 400 });
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return withSecurityHeaders(
+        NextResponse.json({ message: "Invalid request body" }, { status: 400 })
+      );
     }
 
-    if (!["pending", "approved", "rejected"].includes(approval_status)) {
-      return NextResponse.json({ message: "Invalid approval_status" }, { status: 400 });
+    const { product_id, approval_status, rejection_reason } = body;
+
+    if (!product_id || typeof product_id !== "string") {
+      return withSecurityHeaders(
+        NextResponse.json({ message: "product_id is required" }, { status: 400 })
+      );
     }
 
-    const admin = createAdminClient();
+    if (!approval_status || !VALID_APPROVAL_STATUSES.includes(approval_status)) {
+      return withSecurityHeaders(
+        NextResponse.json({ message: "Invalid approval_status. Must be one of: pending, approved, rejected" }, { status: 400 })
+      );
+    }
 
-    // Fetch the current product to get vendor info
     const { data: product } = await admin
       .from("products")
       .select("id, name, vendor_id, vendor_name, approval_status")
@@ -127,21 +108,24 @@ export async function PATCH(req) {
       .single();
 
     if (!product) {
-      return NextResponse.json({ message: "Product not found" }, { status: 404 });
+      return withSecurityHeaders(
+        NextResponse.json({ message: "Product not found" }, { status: 404 })
+      );
     }
 
-    const { data, error } = await admin
+    const { data, error: dbError } = await admin
       .from("products")
       .update({ approval_status })
       .eq("id", product_id)
       .select("id, name, approval_status, vendor_id, vendor_name")
       .single();
 
-    if (error) {
-      return NextResponse.json({ message: error.message }, { status: 500 });
+    if (dbError) {
+      return withSecurityHeaders(
+        NextResponse.json({ message: "Failed to update product" }, { status: 500 })
+      );
     }
 
-    // ── Send notification to vendor ─────────────────────────────────────────
     if (approval_status === "approved" && product.vendor_id) {
       await createNotification({
         user_id: product.vendor_id,
@@ -158,13 +142,12 @@ export async function PATCH(req) {
         user_id: product.vendor_id,
         type: "product_rejected",
         title: "Product Rejected",
-        body: `Your product "${product.name}" was rejected. Please update and resubmit.`,
+        body: `Your product "${product.name}" was rejected.${rejection_reason ? ` Reason: ${rejection_reason}` : ""}`,
         link: `/dashboard/vendor?tab=products`,
         data: { product_id: product.id, vendor_id: product.vendor_id },
       });
     }
 
-    // ── Log the activity ────────────────────────────────────────────────────
     const actionLabel = approval_status === "approved" ? "approve_product" : "reject_product";
     await logActivity({
       actor_id: adminUser.id,
@@ -172,14 +155,14 @@ export async function PATCH(req) {
       entity_type: "product",
       entity_id: product.id,
       description: `${actionLabel.replace("_", " ")}: "${product.name}"`,
-      metadata: { product_id: product.id, approval_status },
+      metadata: { product_id: product.id, approval_status, rejection_reason: rejection_reason || null },
     });
 
-    return NextResponse.json(data, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { message: error.message || "Internal Server Error" },
-      { status: 500 }
+    const response = NextResponse.json(data, { status: 200 });
+    return withSecurityHeaders(response);
+  } catch {
+    return withSecurityHeaders(
+      NextResponse.json({ message: "Internal server error" }, { status: 500 })
     );
   }
 }

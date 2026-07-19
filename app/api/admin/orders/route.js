@@ -1,64 +1,61 @@
-import { createClient } from "@/lib/server";
-import { createAdminClient } from "@/lib/supabaseAdmin";
+import { requireAdmin, sanitizeSearchTerm, parsePagination } from "@/lib/admin-auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { withSecurityHeaders } from "@/lib/secure-headers";
 import { NextResponse } from "next/server";
 
+const VALID_ORDER_STATUSES = ["processing", "shipped", "delivered", "cancelled"];
+const VALID_PAYMENT_STATUSES = ["unpaid", "paid", "failed", "refunded"];
+const RATE_LIMIT_INST = rateLimit({ maxRequests: 60 });
+
 export async function GET(req) {
+  const rl = RATE_LIMIT_INST(req);
+  if (rl.error) return rl.error;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
+    const { error, admin } = await requireAdmin();
+    if (error) return error;
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const paymentStatus = searchParams.get("payment_status");
-    const search = searchParams.get("q");
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
-    const offset = (page - 1) * limit;
+    const search = sanitizeSearchTerm(searchParams.get("q"));
+    const { page, limit, offset } = parsePagination(searchParams);
 
-    const admin = createAdminClient();
+    let countQuery = admin.from("orders").select("*", { count: "exact", head: true });
     let q = admin.from("orders").select("*, order_items(*)");
 
-    if (status && ["processing", "shipped", "delivered", "cancelled"].includes(status)) {
+    if (status && VALID_ORDER_STATUSES.includes(status)) {
       q = q.eq("status", status);
+      countQuery = countQuery.eq("status", status);
     }
 
-    if (paymentStatus && ["unpaid", "paid", "failed", "refunded"].includes(paymentStatus)) {
+    if (paymentStatus && VALID_PAYMENT_STATUSES.includes(paymentStatus)) {
       q = q.eq("payment_status", paymentStatus);
+      countQuery = countQuery.eq("payment_status", paymentStatus);
     }
 
-    if (search && search.trim()) {
-      const safe = search.trim().replace(/[%_'(),]/g, " ");
-      q = q.or(`buyer_name.ilike.%${safe}%,buyer_email.ilike.%${safe}%,id.ilike.%${safe}%`);
+    if (search) {
+      q = q.or(`buyer_name.ilike.%${search}%,buyer_email.ilike.%${search}%,id.ilike.%${search}%`);
+      countQuery = countQuery.or(`buyer_name.ilike.%${search}%,buyer_email.ilike.%${search}%,id.ilike.%${search}%`);
     }
 
-    const { data, error } = await q
+    const { data, error: dbError } = await q
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) {
-      return NextResponse.json({ message: error.message }, { status: 500 });
+    if (dbError) {
+      return withSecurityHeaders(
+        NextResponse.json({ message: "Failed to fetch orders" }, { status: 500 })
+      );
     }
 
-    const { count: total } = await admin
-      .from("orders")
-      .select("*", { count: "exact", head: true });
+    const { count: total } = await countQuery;
 
-    return NextResponse.json({ orders: data || [], total: total || 0, page, limit });
-  } catch (err) {
-    return NextResponse.json(
-      { message: err.message || "Internal Server Error" },
-      { status: 500 }
+    const response = NextResponse.json({ orders: data || [], total: total || 0, page, limit });
+    return withSecurityHeaders(response);
+  } catch {
+    return withSecurityHeaders(
+      NextResponse.json({ message: "Internal server error" }, { status: 500 })
     );
   }
 }

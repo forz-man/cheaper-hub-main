@@ -141,14 +141,6 @@ export default function ProductPage({ params }) {
       const sellerId = product?.vendor_id;
       const productId = product?.id;
 
-      console.log("=== Contact Seller ===");
-      console.log("Product ID:", productId);
-      console.log("Vendor ID:", sellerId);
-      console.log("Product Name:", product?.name);
-      console.log("Vendor Name:", product?.vendor_name);
-      console.log("Buyer ID:", buyerId);
-      console.log("=== End Contact Seller ===");
-
       // Step 1: Create or get conversation
       const conversationResponse = await fetch("/api/conversations", {
         method: "POST",
@@ -169,8 +161,6 @@ export default function ProductPage({ params }) {
 
       const conversationData = await conversationResponse.json();
       const conversationId = conversationData.id;
-
-      console.log("Conversation created/found:", conversationData);
 
       // Step 2: Navigate directly to messages page with conversation ID
       router.push(`/messages?conversationId=${conversationId}`);

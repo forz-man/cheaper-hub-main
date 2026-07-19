@@ -1,23 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, memo, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveUserRole } from "@/lib/auth";
 import {
   LayoutDashboard, Package, ShoppingBag, Users, Store, MessageSquare,
-  Bell, Settings, LogOut, Search, Plus, ChevronRight, ChevronDown,
-  Loader2, AlertTriangle, CheckCircle2, XCircle, Clock, Eye,
-  Briefcase, CreditCard, TrendingUp, UserCheck, Ban, DollarSign,
-  BarChart3, PieChart, Activity, Shield, Menu, X, Filter,
-  Mail, Phone, MapPin, Trash2, MoreHorizontal, RefreshCw,
-  Star, FileText, Image, ShoppingCart, Tag, Percent,
-  Truck, Home, HelpCircle, BookOpen
+  Bell, Settings, LogOut, Search, ChevronDown, Loader2, AlertTriangle,
+  CheckCircle2, XCircle, Clock, Eye, DollarSign, Activity, Shield,
+  Menu, X, RefreshCw, Ban, Trash2, Undo2, ChevronLeft,
+  ChevronRight, Star, ShoppingCart,
 } from "lucide-react";
 import useNotifications from "@/hooks/useNotifications";
-import { motion, AnimatePresence } from "framer-motion";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(n) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n || 0);
@@ -53,9 +47,9 @@ function timeAgo(iso) {
 }
 
 const approvalTabList = [
-  { id: "pending", label: "Pending", Icon: Clock, color: "text-amber-600" },
-  { id: "approved", label: "Approved", Icon: CheckCircle2, color: "text-emerald-600" },
-  { id: "rejected", label: "Rejected", Icon: XCircle, color: "text-red-600" },
+  { id: "pending", label: "Pending", color: "text-amber-600" },
+  { id: "approved", label: "Approved", color: "text-emerald-600" },
+  { id: "rejected", label: "Rejected", color: "text-red-600" },
 ];
 
 const statusConfig = {
@@ -72,15 +66,12 @@ const paymentStatusConfig = {
   refunded: { label: "Refunded", color: "text-purple-600 bg-purple-50" },
 };
 
-// ─── Sidebar Navigation ──────────────────────────────────────────────────────
-
 const SIDEBAR_SECTIONS = [
   { id: "overview", label: "Dashboard", Icon: LayoutDashboard },
   {
     id: "products", label: "Products", Icon: Package,
     children: [
-      { id: "products_all", label: "All Products" },
-      { id: "products_pending", label: "Pending Approval" },
+      { id: "products_pending", label: "Pending" },
       { id: "products_approved", label: "Approved" },
       { id: "products_rejected", label: "Rejected" },
     ],
@@ -88,8 +79,8 @@ const SIDEBAR_SECTIONS = [
   {
     id: "orders", label: "Orders", Icon: ShoppingBag,
     children: [
-      { id: "orders_all", label: "All Orders" },
-      { id: "orders_pending", label: "Pending" },
+      { id: "orders_all", label: "All" },
+      { id: "orders_processing", label: "Processing" },
       { id: "orders_shipped", label: "Shipped" },
       { id: "orders_delivered", label: "Delivered" },
       { id: "orders_cancelled", label: "Cancelled" },
@@ -98,18 +89,17 @@ const SIDEBAR_SECTIONS = [
   {
     id: "users", label: "Users", Icon: Users,
     children: [
-      { id: "users_buyers", label: "Buyers" },
-      { id: "users_vendors", label: "Vendors" },
-      { id: "users_admins", label: "Admins" },
+      { id: "users_all", label: "All" },
+      { id: "users_buyer", label: "Buyers" },
+      { id: "users_vendor", label: "Vendors" },
+      { id: "users_admin", label: "Admins" },
     ],
   },
   { id: "vendors", label: "Vendors", Icon: Store },
   { id: "messages", label: "Contact Messages", Icon: MessageSquare },
-  { id: "notifications_panel", label: "Notifications", Icon: Bell },
+  { id: "activity_log", label: "Activity Log", Icon: Activity },
   { id: "settings", label: "Settings", Icon: Settings },
 ];
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub, Icon, color = "bg-black" }) {
   return (
@@ -126,24 +116,67 @@ function StatCard({ label, value, sub, Icon, color = "bg-black" }) {
   );
 }
 
-// ─── Overview Section ─────────────────────────────────────────────────────────
+const StatCardMemo = memo(StatCard);
+
+function Pagination({ page, total, limit, onPageChange }) {
+  const totalPages = Math.ceil(total / limit);
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+      <span className="text-xs text-gray-400">{total} total</span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <span className="text-xs font-medium text-gray-500">{page} / {totalPages}</span>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function OverviewSection() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/admin/stats")
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load stats");
+        return r.json();
+      })
+      .then((data) => { if (!cancelled) setStats(data); })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+        <AlertTriangle size={24} className="mx-auto mb-2 text-red-500" />
+        <p className="text-sm text-red-700 mb-3">{error}</p>
       </div>
     );
   }
@@ -156,19 +189,29 @@ function OverviewSection() {
     { label: "Vendors", value: formatNumber(stats?.vendorCount), sub: `${formatNumber(stats?.pendingVendors)} need onboarding`, Icon: Store, color: "bg-indigo-600" },
     { label: "Refund Requests", value: formatNumber(stats?.refundRequests), Icon: AlertTriangle, color: "bg-red-600", sub: "Needs attention" },
     { label: "Low Stock", value: formatNumber(stats?.lowStockCount), Icon: AlertTriangle, color: "bg-orange-600", sub: "Products under 5 units" },
-    { label: "Active Users (30d)", value: formatNumber(stats?.activeUsers), Icon: Activity, color: "bg-teal-600", sub: "Engaged users" },
+    { label: "Today Orders", value: formatNumber(stats?.todayOrders), sub: `${formatCurrency(stats?.todayRevenue)} revenue`, Icon: Activity, color: "bg-teal-600" },
   ];
 
   return (
-    <div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map((c) => <StatCard key={c.label} {...c} />)}
-      </div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {cards.map((c) => <StatCardMemo key={c.label} {...c} />)}
     </div>
   );
 }
 
-// ─── Products Section ─────────────────────────────────────────────────────────
+function SearchInput({ value, onChange, placeholder }) {
+  return (
+    <div className="flex-1 bg-white border border-gray-200 rounded-2xl flex items-center overflow-hidden shadow-sm hover:border-gray-400 focus-within:border-black transition-all">
+      <Search size={16} className="ml-4 text-gray-400 flex-shrink-0" />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 text-sm py-3 px-3 outline-none text-black placeholder:text-gray-400 bg-transparent"
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
 
 function ProductsSection({ tab }) {
   const [products, setProducts] = useState([]);
@@ -178,27 +221,34 @@ function ProductsSection({ tab }) {
   const [rejectionModal, setRejectionModal] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
   const approvalStatus = tab.replace("products_", "");
+  const approvalTabLabel = approvalTabList.find((t) => t.id === approvalStatus)?.label || approvalStatus;
 
-  const loadProducts = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams({ approval_status: approvalStatus });
-      if (search.trim()) params.set("q", search.trim());
-      const res = await fetch(`/api/admin/products?${params}`);
-      if (!res.ok) throw new Error("Failed to load");
-      const data = await res.json();
-      setProducts(data.products || data || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [approvalStatus, search]);
-
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+    const params = new URLSearchParams({ approval_status: approvalStatus, page: String(page), limit: String(limit) });
+    if (search.trim()) params.set("q", search.trim());
+    fetch(`/api/admin/products?${params}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load");
+        return r.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setProducts(data.products || []);
+          setTotal(data.total || 0);
+        }
+      })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [approvalStatus, search, page]);
 
   const handleApprove = async (productId) => {
     setActionLoading(productId);
@@ -210,6 +260,7 @@ function ProductsSection({ tab }) {
       });
       if (!res.ok) throw new Error("Failed to approve");
       setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setTotal((prev) => Math.max(0, prev - 1));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -231,6 +282,7 @@ function ProductsSection({ tab }) {
       });
       if (!res.ok) throw new Error("Failed to reject");
       setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setTotal((prev) => Math.max(0, prev - 1));
       setRejectionModal(null);
       setRejectionReason("");
     } catch (err) {
@@ -240,20 +292,10 @@ function ProductsSection({ tab }) {
     }
   };
 
-  const approvalTabLabel = approvalTabList.find((t) => t.id === approvalStatus)?.label || approvalStatus;
-
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 bg-white border border-gray-200 rounded-2xl flex items-center overflow-hidden shadow-sm hover:border-gray-400 focus-within:border-black transition-all">
-          <Search size={16} className="ml-4 text-gray-400 flex-shrink-0" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 text-sm py-3 px-3 outline-none text-black placeholder:text-gray-400 bg-transparent"
-            placeholder={`Search ${approvalTabLabel} products...`}
-          />
-        </div>
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder={`Search ${approvalTabLabel} products...`} />
       </div>
 
       {error && (
@@ -297,7 +339,7 @@ function ProductsSection({ tab }) {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {p.images?.[0] ? (
-                            <img src={p.images[0]} alt="" className="w-full h-full object-contain p-0.5" />
+                            <img src={p.images[0]} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
                           ) : (
                             <Package size={14} className="text-gray-400" />
                           )}
@@ -310,7 +352,7 @@ function ProductsSection({ tab }) {
                     </td>
                     <td className="px-5 py-4 text-gray-500 hidden md:table-cell">{p.vendor_name || "—"}</td>
                     <td className="px-5 py-4 text-gray-400 hidden sm:table-cell">{p.category || "—"}</td>
-                    <td className="px-5 py-4 font-semibold text-black">${parseFloat(p.price).toFixed(2)}</td>
+                    <td className="px-5 py-4 font-semibold text-black">${Number(p.price).toFixed(2)}</td>
                     <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">{p.stock === 0 ? <span className="text-red-500 font-semibold">0</span> : p.stock}</td>
                     <td className="px-5 py-4 text-gray-400 text-xs hidden lg:table-cell">{formatDate(p.created_at)}</td>
                     <td className="px-5 py-4">
@@ -351,16 +393,14 @@ function ProductsSection({ tab }) {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
         </div>
       )}
 
-      {/* Rejection Modal */}
       {rejectionModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
-            <h3 className="font-bold text-black text-lg mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
-              Reject Product
-            </h3>
+            <h3 className="font-bold text-black text-lg mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Reject Product</h3>
             <p className="text-sm text-gray-500 mb-4">
               Are you sure you want to reject <strong>{rejectionModal.name}</strong>?
             </p>
@@ -378,9 +418,7 @@ function ProductsSection({ tab }) {
               <button
                 onClick={() => { setRejectionModal(null); setRejectionReason(""); }}
                 className="text-sm font-semibold text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
+              >Cancel</button>
               <button
                 onClick={() => handleReject(rejectionModal.id)}
                 disabled={actionLoading === rejectionModal.id}
@@ -397,27 +435,45 @@ function ProductsSection({ tab }) {
   );
 }
 
-// ─── Orders Section ───────────────────────────────────────────────────────────
-
 function OrdersSection({ filter }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
-  const loadOrders = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (filter && filter !== "all") params.set("status", filter);
     fetch(`/api/admin/orders?${params}`)
-      .then((r) => r.json())
-      .then((data) => setOrders(data.orders || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [filter]);
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => { if (!cancelled) { setOrders(data.orders || []); setTotal(data.total || 0); } })
+      .catch(() => { if (!cancelled) setOrders([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [filter, page]);
 
-  useEffect(() => { loadOrders(); }, [loadOrders]);
+  if (loading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-2xl p-16 flex items-center justify-center shadow-sm">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  if (loading) return <LoadingSkeleton />;
-  if (orders.length === 0) return <EmptyState icon={ShoppingBag} title="No orders found" />;
+  if (orders.length === 0) {
+    return (
+      <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center shadow-sm">
+        <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <ShoppingBag size={24} className="text-gray-300" />
+        </div>
+        <p className="text-sm font-semibold text-black mb-1">No orders found</p>
+        <p className="text-xs text-gray-400">No orders match the current filter.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
@@ -462,94 +518,317 @@ function OrdersSection({ filter }) {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
     </div>
   );
 }
 
-// ─── Users Section ────────────────────────────────────────────────────────────
-
-function UsersSection({ filter }) {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadUsers = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (filter && filter !== "users_all") {
-      const role = filter.replace("users_", "");
-      if (["buyer", "vendor", "admin"].includes(role)) params.set("role", role);
-    }
-    fetch(`/api/admin/users?${params}`)
-      .then((r) => r.json())
-      .then((data) => setUsers(data.users || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [filter]);
-
-  useEffect(() => { loadUsers(); }, [loadUsers]);
-
-  if (loading) return <LoadingSkeleton />;
-  if (users.length === 0) return <EmptyState icon={Users} title="No users found" />;
-
+function ConfirmationModal({ title, message, confirmLabel, confirmVariant = "danger", loading, onConfirm, onCancel }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Email</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Role</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Joined</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold">
-                      {u.full_name?.[0] || u.email?.[0] || "?"}
-                    </div>
-                    <div className="font-medium text-black">{u.full_name || "—"}</div>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">{u.email || "—"}</td>
-                <td className="px-5 py-4">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                    u.role === "admin" ? "bg-purple-50 text-purple-600" :
-                    u.role === "vendor" ? "bg-blue-50 text-blue-600" :
-                    "bg-gray-50 text-gray-600"
-                  }`}>
-                    {u.role || "—"}
-                  </span>
-                </td>
-                <td className="px-5 py-4 text-xs text-gray-400 hidden md:table-cell">{formatDate(u.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+        <h3 className="font-bold text-black text-lg mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{title}</h3>
+        <p className="text-sm text-gray-500 mb-6">{message}</p>
+        <div className="flex items-center gap-3 justify-end">
+          <button onClick={onCancel} disabled={loading} className="text-sm font-semibold text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40">Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className={`flex items-center gap-2 text-sm font-semibold text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-40 ${confirmVariant === "danger" ? "bg-red-600 hover:bg-red-700" : "bg-black hover:bg-gray-800"}`}
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Vendors Section ──────────────────────────────────────────────────────────
+function RoleBadge({ role }) {
+  const colors = {
+    admin: "bg-purple-50 text-purple-600",
+    vendor: "bg-blue-50 text-blue-600",
+    buyer: "bg-gray-50 text-gray-600",
+  };
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors[role] || "bg-gray-50 text-gray-600"}`}>
+      {role || "—"}
+    </span>
+  );
+}
+
+function UsersSection({ filter }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const limit = 20;
+
+  const roleLabel = filter === "users_all" ? "all" : filter.replace("users_", "");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (filter && filter !== "users_all") {
+      const role = filter.replace("users_", "");
+      if (["buyer", "vendor", "admin"].includes(role)) params.set("role", role);
+    }
+    if (search.trim()) params.set("q", search.trim());
+    fetch(`/api/admin/users?${params}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load");
+        return r.json();
+      })
+      .then((data) => { if (!cancelled) { setUsers(data.users || []); setTotal(data.total || 0); } })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [filter, search, page]);
+
+  const handleAction = async (userId, action, value) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, action, value }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Action failed");
+      }
+      setConfirmModal(null);
+      startTransition(() => {
+        const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+        if (filter && filter !== "users_all") {
+          const role = filter.replace("users_", "");
+          if (["buyer", "vendor", "admin"].includes(role)) params.set("role", role);
+        }
+        if (search.trim()) params.set("q", search.trim());
+        fetch(`/api/admin/users?${params}`)
+          .then((r) => r.ok ? r.json() : Promise.reject())
+          .then((data) => { setUsers(data.users || []); setTotal(data.total || 0); })
+          .catch(() => {});
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const showConfirm = (user, actionType, detail) => {
+    const actions = {
+      promote_vendor: { title: "Promote to Admin", message: `Make "${user.full_name || user.email}" an admin? They will have full access.`, confirmLabel: "Promote", variant: "primary" },
+      promote_buyer: { title: "Promote to Vendor", message: `Make "${user.full_name || user.email}" a vendor? They can list products.`, confirmLabel: "Promote", variant: "primary" },
+      demote_admin: { title: "Demote Admin", message: `Remove admin from "${user.full_name || user.email}"? They will lose dashboard access.`, confirmLabel: "Demote", variant: "danger" },
+      suspend: { title: "Suspend User", message: `Suspend "${user.full_name || user.email}"? They will be unable to use the platform.`, confirmLabel: "Suspend", variant: "danger" },
+      unsuspend: { title: "Unsuspend User", message: `Restore "${user.full_name || user.email}"? They will regain access.`, confirmLabel: "Unsuspend", variant: "primary" },
+      soft_delete: { title: "Delete User", message: `Soft-delete "${user.full_name || user.email}"? Their profile will be hidden.`, confirmLabel: "Delete", variant: "danger" },
+      restore: { title: "Restore User", message: `Restore "${user.full_name || user.email}"? Their profile will be visible again.`, confirmLabel: "Restore", variant: "primary" },
+    };
+    const config = actions[actionType];
+    setConfirmModal({ user, actionType, ...config });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-6">
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder={`Search ${roleLabel} users...`} />
+      </div>
+
+      {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700">{error}</div>}
+
+      {loading ? (
+        <div className="bg-white border border-gray-200 rounded-2xl p-16 flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+        </div>
+      ) : users.length === 0 ? (
+        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center shadow-sm">
+          <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Users size={24} className="text-gray-300" />
+          </div>
+          <p className="text-sm font-semibold text-black mb-1">No users found</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Email</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Role</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Status</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Joined</th>
+                  <th className="px-5 py-3.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold">
+                          {u.full_name?.[0] || u.email?.[0] || "?"}
+                        </div>
+                        <div className="font-medium text-black">{u.full_name || "—"}</div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">{u.email || "—"}</td>
+                    <td className="px-5 py-4"><RoleBadge role={u.role} /></td>
+                    <td className="px-5 py-4 hidden md:table-cell">
+                      {u.suspended ? (
+                        <span className="text-[10px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Suspended</span>
+                      ) : u.deleted ? (
+                        <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Deleted</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-gray-400 hidden lg:table-cell">{formatDate(u.created_at)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {(u.role === "buyer" || u.role === "vendor") && (
+                          <button
+                            onClick={() => showConfirm(u, u.role === "buyer" ? "promote_buyer" : "promote_vendor")}
+                            className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-100"
+                          >
+                            {u.role === "buyer" ? "→ Vendor" : "→ Admin"}
+                          </button>
+                        )}
+                        {u.role === "admin" && (
+                          <button
+                            onClick={() => showConfirm(u, "demote_admin")}
+                            className="text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-lg hover:bg-orange-100"
+                          >
+                            Demote
+                          </button>
+                        )}
+                        {!u.suspended && !u.deleted && (
+                          <button
+                            onClick={() => showConfirm(u, "suspend")}
+                            className="text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-100"
+                          >
+                            <Ban size={10} className="inline mr-0.5" />Suspend
+                          </button>
+                        )}
+                        {u.suspended && (
+                          <button
+                            onClick={() => showConfirm(u, "unsuspend")}
+                            className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg hover:bg-emerald-100"
+                          >
+                            <CheckCircle2 size={10} className="inline mr-0.5" />Unsuspend
+                          </button>
+                        )}
+                        {!u.deleted && (
+                          <button
+                            onClick={() => showConfirm(u, "soft_delete")}
+                            className="text-[10px] font-semibold text-gray-500 border border-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100"
+                          >
+                            <Trash2 size={10} className="inline mr-0.5" />Delete
+                          </button>
+                        )}
+                        {u.deleted && (
+                          <button
+                            onClick={() => showConfirm(u, "restore")}
+                            className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg hover:bg-emerald-100"
+                          >
+                            <Undo2 size={10} className="inline mr-0.5" />Restore
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+        </div>
+      )}
+
+      {confirmModal && (
+        <ConfirmationModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmLabel={confirmModal.confirmLabel}
+          confirmVariant={confirmModal.variant}
+          loading={actionLoading}
+          onConfirm={() => {
+            const actionMap = {
+              promote_buyer: "change_role",
+              promote_vendor: "change_role",
+              demote_admin: "change_role",
+              suspend: "suspend",
+              unsuspend: "unsuspend",
+              soft_delete: "soft_delete",
+              restore: "restore",
+            };
+            const valueMap = {
+              promote_buyer: "vendor",
+              promote_vendor: "admin",
+              demote_admin: "vendor",
+            };
+            handleAction(confirmModal.user.id, actionMap[confirmModal.actionType], valueMap[confirmModal.actionType]);
+          }}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
+    </div>
+  );
+}
 
 function VendorsSection() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     fetch("/api/admin/vendors")
-      .then((r) => r.json())
-      .then((data) => setVendors(data.vendors || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => { if (!cancelled) setVendors(data.vendors || []); })
+      .catch(() => { if (!cancelled) setError("Failed to load vendors"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <LoadingSkeleton />;
-  if (vendors.length === 0) return <EmptyState icon={Store} title="No vendors found" />;
+  if (loading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-2xl p-16 flex items-center justify-center shadow-sm">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+        <AlertTriangle size={24} className="mx-auto mb-2 text-red-500" />
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (vendors.length === 0) {
+    return (
+      <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center shadow-sm">
+        <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Store size={24} className="text-gray-300" />
+        </div>
+        <p className="text-sm font-semibold text-black mb-1">No vendors found</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
@@ -594,26 +873,27 @@ function VendorsSection() {
   );
 }
 
-// ─── Contact Messages Section ─────────────────────────────────────────────────
-
 function ContactMessagesSection() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("new");
   const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
-  const loadMessages = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    const params = new URLSearchParams();
-    if (statusFilter) params.set("status", statusFilter);
+    const params = new URLSearchParams({ status: statusFilter, page: String(page), limit: String(limit) });
     fetch(`/api/admin/contact-messages?${params}`)
-      .then((r) => r.json())
-      .then((data) => setMessages(data.messages || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
-
-  useEffect(() => { loadMessages(); if (selected) setSelected(null); }, [loadMessages]); // eslint-disable-line react-hooks/exhaustive-deps
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => { if (!cancelled) { setMessages(data.messages || []); setTotal(data.total || 0); } })
+      .catch(() => { if (!cancelled) setMessages([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    if (!cancelled && selected) setSelected(null);
+    return () => { cancelled = true; };
+  }, [statusFilter, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStatusChange = async (id, status) => {
     await fetch("/api/admin/contact-messages", {
@@ -621,7 +901,12 @@ function ContactMessagesSection() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message_id: id, status }),
     });
-    loadMessages();
+    startTransition(() => {
+      const params = new URLSearchParams({ status: statusFilter, page: String(page), limit: String(limit) });
+      fetch(`/api/admin/contact-messages?${params}`)
+        .then((r) => r.ok ? r.json() : Promise.reject())
+        .then((data) => { setMessages(data.messages || []); setTotal(data.total || 0); });
+    });
   };
 
   return (
@@ -631,7 +916,7 @@ function ContactMessagesSection() {
           {["new", "read", "resolved"].map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => { setStatusFilter(s); setPage(1); }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                 statusFilter === s ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"
               }`}
@@ -641,8 +926,17 @@ function ContactMessagesSection() {
           ))}
         </div>
 
-        {loading ? <LoadingSkeleton /> : messages.length === 0 ? (
-          <EmptyState icon={MessageSquare} title="No messages" />
+        {loading ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-10 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center">
+            <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <MessageSquare size={20} className="text-gray-300" />
+            </div>
+            <p className="text-sm font-semibold text-black">No messages</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {messages.map((m) => (
@@ -663,6 +957,7 @@ function ContactMessagesSection() {
             ))}
           </div>
         )}
+        <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
@@ -675,11 +970,8 @@ function ContactMessagesSection() {
               </div>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                 selected.status === "new" ? "bg-amber-50 text-amber-600" :
-                selected.status === "read" ? "bg-blue-50 text-blue-600" :
-                "bg-emerald-50 text-emerald-600"
-              }`}>
-                {selected.status}
-              </span>
+                selected.status === "read" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+              }`}>{selected.status}</span>
             </div>
             <div className="mb-4">
               <div className="text-xs font-semibold text-gray-400 mb-1">Subject</div>
@@ -694,17 +986,13 @@ function ContactMessagesSection() {
                 <button
                   onClick={() => handleStatusChange(selected.id, "resolved")}
                   className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-colors"
-                >
-                  Mark resolved
-                </button>
+                >Mark resolved</button>
               )}
               {selected.status === "new" && (
                 <button
                   onClick={() => handleStatusChange(selected.id, "read")}
                   className="text-xs font-semibold text-gray-500 border border-gray-200 px-4 py-2 rounded-xl hover:border-gray-400 hover:text-black transition-colors"
-                >
-                  Mark read
-                </button>
+                >Mark read</button>
               )}
             </div>
           </div>
@@ -719,95 +1007,284 @@ function ContactMessagesSection() {
   );
 }
 
-// ─── Notifications Panel ─────────────────────────────────────────────────────
+function ActivityLogSection() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [entityTypeFilter, setEntityTypeFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
-function NotificationsPanel() {
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search.trim()) params.set("q", search.trim());
+    if (actionFilter) params.set("action", actionFilter);
+    if (entityTypeFilter) params.set("entity_type", entityTypeFilter);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    fetch(`/api/admin/activity?${params}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => { if (!cancelled) { setLogs(data.logs || []); setTotal(data.total || 0); } })
+      .catch(() => { if (!cancelled) setLogs([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [search, actionFilter, entityTypeFilter, dateFrom, dateTo, page]);
+
   return (
-    <div className="text-center py-10 text-gray-400">
-      <Bell size={24} className="mx-auto mb-2" />
-      <p className="text-sm">View all notifications on the</p>
-      <a href="/notifications" className="text-sm font-semibold text-black hover:underline">Notifications page →</a>
+    <div>
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search activity..." />
+        <select
+          value={actionFilter}
+          onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+        >
+          <option value="">All Actions</option>
+          <option value="approve_product">Approve Product</option>
+          <option value="reject_product">Reject Product</option>
+          <option value="change_role">Change Role</option>
+          <option value="suspend_user">Suspend User</option>
+          <option value="unsuspend_user">Unsuspend User</option>
+          <option value="soft_delete_user">Delete User</option>
+          <option value="restore_user">Restore User</option>
+          <option value="update_setting">Update Setting</option>
+        </select>
+        <select
+          value={entityTypeFilter}
+          onChange={(e) => { setEntityTypeFilter(e.target.value); setPage(1); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+        >
+          <option value="">All Types</option>
+          <option value="product">Product</option>
+          <option value="user">User</option>
+          <option value="setting">Setting</option>
+          <option value="order">Order</option>
+          <option value="vendor">Vendor</option>
+        </select>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+          placeholder="From"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+          placeholder="To"
+        />
+      </div>
+
+      {loading ? (
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+        </div>
+      ) : logs.length === 0 ? (
+        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
+          <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Activity size={24} className="text-gray-300" />
+          </div>
+          <p className="text-sm font-semibold text-black mb-1">No activity logged yet</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Admin</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Action</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Target</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Description</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-50/80">
+                    <td className="px-5 py-3">
+                      <span className="text-xs font-medium text-black">{log.actor_name || "Unknown"}</span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-xs font-medium text-black capitalize">{log.action.replace(/_/g, " ")}</span>
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{log.entity_type}</span>
+                      {log.entity_id && <span className="text-[10px] text-gray-400 ml-1 font-mono">#{log.entity_id.slice(0, 8)}</span>}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-400 hidden lg:table-cell max-w-xs truncate">{log.description || "—"}</td>
+                    <td className="px-5 py-3 text-xs text-gray-400">{formatDateTime(log.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+        </div>
+      )}
     </div>
   );
 }
-
-// ─── Settings Section ─────────────────────────────────────────────────────────
-
 function SettingsSection() {
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+  const [saveMessage, setSaveMessage] = useState({});
+  const [error, setError] = useState(null);
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000); }, 500);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/settings")
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load settings");
+        return r.json();
+      })
+      .then((data) => { if (!cancelled) setSettings(data.settings || {}); })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSave = async (key) => {
+    setSaving(key);
+    try {
+      const input = document.querySelector(`[data-setting-key="${key}"]`);
+      const value = input?.value || "";
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to save");
+      }
+      const data = await res.json();
+      setSettings(data.settings || {});
+      setSaveMessage((prev) => ({ ...prev, [key]: "Saved!" }));
+      setTimeout(() => setSaveMessage((prev) => ({ ...prev, [key]: null })), 2000);
+    } catch (err) {
+      setSaveMessage((prev) => ({ ...prev, [key]: err.message || "Error" }));
+      setTimeout(() => setSaveMessage((prev) => ({ ...prev, [key]: null })), 3000);
+    } finally {
+      setSaving(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-2xl p-10 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+        <AlertTriangle size={24} className="mx-auto mb-2 text-red-500" />
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  const getValue = (key) => {
+    const v = settings[key];
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") return JSON.stringify(v);
+    return String(v).replace(/^"(.*)"$/, "$1");
+  };
+
+  const fields = [
+    { key: "site_name", label: "Site Name", type: "text" },
+    { key: "platform_name", label: "Platform Name", type: "text" },
+    { key: "support_email", label: "Support Email", type: "email" },
+    { key: "contact_number", label: "Contact Number", type: "text" },
+    { key: "commission_rate", label: "Commission Rate (%)", type: "number", min: 0, max: 100, step: 0.1 },
+    { key: "platform_fee", label: "Platform Fee ($)", type: "number", min: 0, step: 0.01 },
+    { key: "tax_rate", label: "Tax Rate (%)", type: "number", min: 0, max: 100, step: 0.1 },
+    { key: "shipping_flat_rate", label: "Shipping Flat Rate ($)", type: "number", min: 0, step: 0.01 },
+    { key: "free_shipping_threshold", label: "Free Shipping Threshold ($)", type: "number", min: 0, step: 0.01 },
+    { key: "currency", label: "Currency", type: "text" },
+    {
+      key: "maintenance_mode", label: "Maintenance Mode", type: "select",
+      options: [{ value: "false", label: "Disabled" }, { value: "true", label: "Enabled" }],
+    },
+    {
+      key: "allow_vendor_registration", label: "Allow Vendor Registration", type: "select",
+      options: [{ value: "true", label: "Enabled" }, { value: "false", label: "Disabled" }],
+    },
+    {
+      key: "allow_product_submission", label: "Allow Product Submission", type: "select",
+      options: [{ value: "true", label: "Enabled" }, { value: "false", label: "Disabled" }],
+    },
+  ];
 
   return (
     <div className="max-w-2xl space-y-4">
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <h3 className="font-semibold text-black text-sm mb-4" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>General Settings</h3>
+        <h3 className="font-semibold text-black text-sm mb-4" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Platform Settings</h3>
         <div className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1.5">Platform name</label>
-            <input
-              defaultValue="Cheaper"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1.5">Support email</label>
-            <input
-              defaultValue="support@cheaper.com"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1.5">Commission rate (%)</label>
-            <input
-              type="number"
-              defaultValue="10"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
-            />
-          </div>
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-xs text-gray-400">Changes are saved immediately.</p>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40"
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : "Save changes"}
-            </button>
-          </div>
+          {fields.map((field) => (
+            <div key={field.key}>
+              <label className="text-xs font-semibold text-gray-500 block mb-1.5">{field.label}</label>
+              <div className="flex items-center gap-2">
+                {field.type === "select" ? (
+                  <select
+                    data-setting-key={field.key}
+                    defaultValue={getValue(field.key) || "false"}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black bg-white"
+                  >
+                    {field.options.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    data-setting-key={field.key}
+                    type={field.type}
+                    defaultValue={getValue(field.key)}
+                    min={field.min}
+                    max={field.max}
+                    step={field.step}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
+                  />
+                )}
+                <button
+                  onClick={() => handleSave(field.key)}
+                  disabled={saving === field.key}
+                  className="flex items-center gap-1 bg-black text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 flex-shrink-0"
+                >
+                  {saving === field.key ? <Loader2 size={14} className="animate-spin" /> : saveMessage[field.key] || "Save"}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+      <p className="text-xs text-gray-400">Changes are saved individually. Each setting is persisted to the database.</p>
     </div>
   );
 }
 
-// ─── Empty State & Loading Skeleton ──────────────────────────────────────────
-
-function EmptyState({ icon: Icon, title, desc }) {
-  return (
-    <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center shadow-sm">
-      <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <Icon size={24} className="text-gray-300" />
-      </div>
-      <p className="text-sm font-semibold text-black mb-1">{title}</p>
-      {desc && <p className="text-xs text-gray-400">{desc}</p>}
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-10 flex items-center justify-center shadow-sm">
-      <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
-    </div>
-  );
-}
-
-// ─── Main Dashboard ──────────────────────────────────────────────────────────
+const sectionComponents = {
+  overview: OverviewSection,
+  products: ProductsSection,
+  orders: OrdersSection,
+  users: UsersSection,
+  vendors: VendorsSection,
+  messages: ContactMessagesSection,
+  activity_log: ActivityLogSection,
+  settings: SettingsSection,
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -815,37 +1292,31 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState(["products"]);
+  const [expandedMenus, setExpandedMenus] = useState(["products", "orders", "users"]);
 
-  const userRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
-  const {
-    items: notifItems,
-    unreadCount: notifUnreadCount,
-  } = useNotifications(user?.id, userRole);
+  const { unreadCount: notifUnreadCount } = useNotifications(user?.id, user?.user_metadata?.role || user?.app_metadata?.role || null);
 
-  // Deep-link: ?section=products&tab=pending
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const s = params.get("section");
     const tab = params.get("tab");
     const target = s ? (tab ? `${s}_${tab}` : s) : "overview";
-    if (target !== "overview") {
-      setSection(target);
-    }
+    if (target !== "overview") setSection(target);
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace("/login"); return; }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       const role = resolveUserRole(user, profile?.role);
       if (role !== "admin") { router.replace("/dashboard"); return; }
-      setUser(user);
-      setLoading(false);
+      if (!cancelled) { setUser(user); setLoading(false); }
     }
     checkAuth();
+    return () => { cancelled = true; };
   }, [router]);
 
   const handleLogout = async () => {
@@ -875,6 +1346,13 @@ export default function AdminDashboard() {
     return "Dashboard";
   };
 
+  const getSectionBase = (sectionId) => {
+    if (sectionId.startsWith("products")) return "products";
+    if (sectionId.startsWith("orders")) return "orders";
+    if (sectionId.startsWith("users")) return "users";
+    return sectionId;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -883,14 +1361,14 @@ export default function AdminDashboard() {
     );
   }
 
+  const SectionComponent = sectionComponents[getSectionBase(section)];
+
   return (
     <div className="min-h-screen bg-gray-50 flex" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-white border-r border-gray-200 overflow-y-auto transition-transform duration-300 ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}>
@@ -933,9 +1411,7 @@ export default function AdminDashboard() {
                           key={child.id}
                           onClick={() => navigateTo(child.id)}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            section === child.id
-                              ? "bg-gray-100 text-black"
-                              : "text-gray-500 hover:text-black hover:bg-gray-50"
+                            section === child.id ? "bg-gray-100 text-black" : "text-gray-500 hover:text-black hover:bg-gray-50"
                           }`}
                         >
                           {child.label}
@@ -957,9 +1433,6 @@ export default function AdminDashboard() {
               >
                 <s.Icon size={16} />
                 {s.label}
-                {s.id === "notifications_panel" && notifUnreadCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{notifUnreadCount > 9 ? "9+" : notifUnreadCount}</span>
-                )}
               </button>
             );
           })}
@@ -976,7 +1449,6 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 min-w-0">
         <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-sm border-b border-gray-200">
           <div className="flex items-center justify-between px-4 lg:px-8 py-3">
@@ -1006,14 +1478,13 @@ export default function AdminDashboard() {
         </div>
 
         <div className="p-4 lg:p-8">
-          {section === "overview" && <OverviewSection />}
-          {section.startsWith("products") && <ProductsSection tab={section} />}
-          {section.startsWith("orders") && <OrdersSection filter={section.replace("orders_", "")} />}
-          {section.startsWith("users") && <UsersSection filter={section} />}
-          {section === "vendors" && <VendorsSection />}
-          {section === "messages" && <ContactMessagesSection />}
-          {section === "notifications_panel" && <NotificationsPanel />}
-          {section === "settings" && <SettingsSection />}
+          {SectionComponent && (
+            <SectionComponent
+              key={section}
+              tab={section}
+              filter={section.startsWith("orders") ? section.replace("orders_", "") : section}
+            />
+          )}
         </div>
       </main>
     </div>
