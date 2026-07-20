@@ -24,13 +24,12 @@ export default function DashboardPage() {
     let cancelled = false;
 
     async function resolveRole() {
-      let role = resolveUserRole(user, null);
-
-      if (!role) {
-        const { data: profile } = await supabase
-          .from("profiles").select("role").eq("id", user.id).single();
-        role = resolveUserRole(user, profile?.role);
-      }
+      // Always fetch the latest role from the database so admin role
+      // changes are picked up immediately without waiting for JWT refresh.
+      const { data: profile } = await supabase
+        .from("profiles").select("role").eq("id", user.id).single();
+      const role = resolveUserRole(user, profile?.role);
+      console.log("[DashboardPage] Resolved role:", role, "Profile role:", profile?.role, "User metadata role:", user?.user_metadata?.role);
 
       if (cancelled) return;
 
@@ -39,6 +38,7 @@ export default function DashboardPage() {
         ? new URLSearchParams(window.location.search).get("tab")
         : null;
       const dest = role ? destinationForRole(role) : "/select-role?from=dashboard";
+      console.log("[DashboardPage] Redirecting to:", dest);
       router.replace(role && tab ? `${dest}?tab=${tab}` : dest);
       setResolving(false);
     }

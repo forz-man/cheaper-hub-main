@@ -72,19 +72,19 @@ export default function Navbar() {
   const { count: cartCount, openCart } = useCart();
   const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
   const [profileRole, setProfileRole] = useState(null);
-  const userRole = metadataRole || profileRole;
+  const userRole = profileRole || metadataRole;
 
-  // Metadata doesn't always carry the role (e.g. older accounts created
-  // before /select-role started writing it to auth metadata) — fall back to
-  // the profiles table so links still route correctly.
+  // Always fetch the latest role from the profiles table so that admin
+  // role changes are reflected immediately (the JWT may still carry the
+  // old user_metadata.role until the next token refresh).
   useEffect(() => {
-    if (!user?.id || metadataRole || !supabase) return;
+    if (!user?.id || !supabase) return;
     let cancelled = false;
     supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
       if (!cancelled && data?.role) setProfileRole(data.role);
     });
     return () => { cancelled = true; };
-  }, [user?.id, metadataRole]);
+  }, [user?.id]);
 
   const {
     items: notifItems,

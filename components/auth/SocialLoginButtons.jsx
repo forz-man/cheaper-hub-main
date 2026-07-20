@@ -23,11 +23,14 @@ function AppleIcon() {
 
 export default function SocialLoginButtons({ role }) {
   const handleGoogle = async () => {
+    console.log("[SocialLoginButtons] Google clicked, role:", role);
     const { error } = await loginWithGoogle(role);
     if (error) console.error("Google login error:", error.message);
+    else console.log("[SocialLoginButtons] Google OAuth initiated");
   };
 
   const handleApple = async () => {
+    console.log("[SocialLoginButtons] Apple clicked, role:", role);
     const { error } = await loginWithApple(role);
     if (error) console.error("Apple login error:", error.message);
   };

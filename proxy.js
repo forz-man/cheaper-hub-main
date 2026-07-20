@@ -10,6 +10,7 @@ const PUBLIC_ROUTES = new Set([
   "/reset-password",
   "/verify-email",
   "/auth/callback",
+  "/api/auth/callback",
   "/contact",
 ]);
 
@@ -37,6 +38,8 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
+  console.log("[middleware] Pathname:", pathname, "IsPublic:", PUBLIC_ROUTES.has(pathname));
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -61,6 +64,8 @@ export async function proxy(request) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+
+  console.log("[middleware] User:", user?.email || "none");
 
   if (!user) {
     if (isAdminRoute(pathname)) {

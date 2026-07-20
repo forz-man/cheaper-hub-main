@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";
 import AuthCard from "@/components/auth/AuthCard";
 import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import { login } from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -29,10 +31,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Always go to /dashboard — it handles role routing internally.
-    // Sending vendors to /dashboard/vendor caused a visible flash because
-    // that legacy page does its own auth check before redirecting onward.
-    router.replace("/dashboard");
+    // Redirect back to the saved URL (or /dashboard which handles role routing)
+    router.replace(next);
   };
 
   return (
@@ -107,5 +107,17 @@ export default function LoginPage() {
         </p>
       </AuthCard>
     </AuthShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f3ef]">
+        <div className="w-7 h-7 border-2 border-[#111] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
