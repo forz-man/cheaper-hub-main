@@ -10,6 +10,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("products")
       .select("*")
+      .eq("approval_status", "approved")
       .order("created_at", { ascending: false });
 
     if (error) {

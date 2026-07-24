@@ -27,7 +27,7 @@ export async function POST(req) {
     const productIds = [...new Set(items.map((i) => String(i.id)))];
     const { data: products, error: productsErr } = await supabase
       .from("products")
-      .select("id, name, price, vendor_id, vendor_name, status, stock")
+      .select("id, name, price, vendor_id, vendor_name, status, approval_status, stock")
       .in("id", productIds);
 
     if (productsErr) throw productsErr;
@@ -42,7 +42,7 @@ export async function POST(req) {
       if (!product) {
         return NextResponse.json({ error: `Product ${requested.id} is no longer available.` }, { status: 400 });
       }
-      if (product.status !== "active") {
+      if (product.status !== "active" || product.approval_status !== "approved") {
         return NextResponse.json({ error: `${product.name} is no longer available.` }, { status: 400 });
       }
       if (qty < 1 || qty > product.stock) {

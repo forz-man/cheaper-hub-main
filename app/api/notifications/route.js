@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/server";
+import { createAdminClient } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 
 // GET /api/notifications?userId=<uuid>&role=<buyer|vendor|admin>
 // Returns unread-message notifications (real, backed by messages.is_read)
-// plus recent order/payout activity relevant to the user's role.
+// plus recent order/payout activity for the user's role,
+// plus structured notifications from the notifications table.
 export async function GET(request) {
   try {
     const supabase = await createClient();
@@ -150,9 +152,79 @@ export async function GET(request) {
       }
     }
 
+    // ── Structured notifications from notifications table ───────────────────
+    const { data: dbNotifs } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (dbNotifs && dbNotifs.length > 0) {
+      for (const n of dbNotifs) {
+        items.push({
+          id: `notif-${n.id}`,
+          type: n.type,
+          title: n.title,
+          body: n.body || "",
+          timestamp: n.created_at,
+          href: n.link || "#",
+          unread: !n.is_read,
+          dbId: n.id,
+          data: n.data,
+        });
+      }
+    }
+
+    // ── Merge and sort all items by timestamp ───────────────────────────────
     items.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    return NextResponse.json({ unreadMessages, items: items.slice(0, 20) });
+    return NextResponse.json({ unreadMessages, items: items.slice(0, 30) });
+  } catch (err) {
+    return NextResponse.json(
+      { message: err.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/notifications — Create a notification (service-role, for server-side use)
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { user_id, type, title, body: notifBody, link, data: metaData } = body;
+
+    if (!user_id || !type || !title) {
+      return NextResponse.json({ message: "user_id, type, and title are required" }, { status: 400 });
+    }
+
+    const validTypes = ["product_pending", "product_approved", "product_rejected", "order_update", "payout_release", "system"];
+    if (!validTypes.includes(type)) {
+      return NextResponse.json({ message: `Invalid type. Must be one of: ${validTypes.join(", ")}` }, { status: 400 });
+    }
+
+    const payload = {
+      user_id,
+      type,
+      title,
+      body: notifBody || null,
+      link: link || null,
+      data: metaData || {},
+      is_read: false,
+    };
+
+    const admin = createAdminClient();
+    const { data: created, error } = await admin
+      .from("notifications")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(created, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { message: err.message || "Internal Server Error" },

@@ -74,6 +74,7 @@ export default function MarketplacePage() {
     let q = supabase
       .from("products")
       .select("id, name, vendor_name, price, original_price, category, stock, status, images")
+      .eq("approval_status", "approved")
       .eq("status", "active");
 
     if (search.trim()) {

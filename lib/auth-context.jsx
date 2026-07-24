@@ -40,29 +40,37 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
 
-    // getSession() reads from the cookie/localStorage cache — no network round-trip.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    async function initAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[AuthProvider] getSession:", session?.user?.email || "no session");
+
       if (session?.user) {
         const expired = checkAndUpdateIdle();
         if (expired) {
-          // More than IDLE_DAYS since last visit — treat as logged out.
+          console.log("[AuthProvider] Session expired (idle), signing out");
           await supabase.auth.signOut();
           clearIdle();
           setUser(null);
         } else {
-          setUser(session.user);
+          // Use getUser() (network request) over getSession() (cached JWT)
+          // so metadata changes (e.g. role update by admin) are reflected.
+          const { data: { user: latestUser } } = await supabase.auth.getUser();
+          console.log("[AuthProvider] getUser:", latestUser?.email || "no user");
+          setUser(latestUser || session.user);
         }
       } else {
-        clearIdle(); // no session — clear any stale timestamp
+        clearIdle();
         setUser(null);
       }
       setLoading(false);
-    });
+    }
 
-    // Keep state in sync across tabs and after OAuth.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[AuthProvider] onAuthStateChange:", event, session?.user?.email || "no session");
       if (session?.user) {
-        checkAndUpdateIdle(); // refresh the "last seen" timestamp on any auth event
+        checkAndUpdateIdle();
         setUser(session.user);
       } else {
         clearIdle();

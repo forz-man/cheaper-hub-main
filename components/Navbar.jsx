@@ -8,7 +8,7 @@ import {
   ShoppingBag, Heart, Bell, Home, Package, Store,
   Tag, HelpCircle, Settings, ChevronDown, ShoppingCart,
   TrendingUp, Sparkles, Layers, Megaphone,
-  BadgePercent
+  BadgePercent, AlertCircle, CheckCircle2, XCircle
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useNotifications from "@/hooks/useNotifications";
@@ -72,19 +72,19 @@ export default function Navbar() {
   const { count: cartCount, openCart } = useCart();
   const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
   const [profileRole, setProfileRole] = useState(null);
-  const userRole = metadataRole || profileRole;
+  const userRole = profileRole || metadataRole;
 
-  // Metadata doesn't always carry the role (e.g. older accounts created
-  // before /select-role started writing it to auth metadata) — fall back to
-  // the profiles table so links still route correctly.
+  // Always fetch the latest role from the profiles table so that admin
+  // role changes are reflected immediately (the JWT may still carry the
+  // old user_metadata.role until the next token refresh).
   useEffect(() => {
-    if (!user?.id || metadataRole || !supabase) return;
+    if (!user?.id || !supabase) return;
     let cancelled = false;
     supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
       if (!cancelled && data?.role) setProfileRole(data.role);
     });
     return () => { cancelled = true; };
-  }, [user?.id, metadataRole]);
+  }, [user?.id]);
 
   const {
     items: notifItems,
@@ -92,6 +92,7 @@ export default function Navbar() {
     unreadCount: notifUnreadCount,
     markAllSeen,
     markMessageRead,
+    markAsRead,
   } = useNotifications(user?.id, userRole);
   const [wishlistCount, setWishlistCount] = useState(3);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -303,11 +304,15 @@ export default function Navbar() {
                             {notifItems.length === 0 ? (
                               <div className="px-4 py-10 text-center">
                                 <Bell size={22} className="text-gray-300 mx-auto mb-2" />
-                                <p className="text-xs text-gray-400">You're all caught up</p>
+                                <p className="text-xs text-gray-400">You&apos;re all caught up</p>
                               </div>
                             ) : (
-                              notifItems.map((item) => {
-                                const Icon = item.type === "message" ? MessageCircle : item.type === "payout" ? AwardIcon : Package;
+                              notifItems.slice(0, 5).map((item) => {
+                                const Icon = item.type === "message" ? MessageCircle : item.type === "payout" || item.type === "payout_release" ? AwardIcon : item.type === "product_pending" ? AlertCircle : item.type === "product_approved" ? CheckCircle2 : item.type === "product_rejected" ? XCircle : Package;
+                                const isProductType = ["product_pending", "product_approved", "product_rejected"].includes(item.type);
+                                const iconBg = item.unread && isProductType
+                                  ? { product_pending: "bg-amber-50 text-amber-600", product_approved: "bg-emerald-50 text-emerald-600", product_rejected: "bg-red-50 text-red-600" }[item.type]
+                                  : item.unread ? "bg-black text-white" : "bg-gray-50 text-gray-400";
                                 return (
                                   <button
                                     key={item.id}
@@ -315,12 +320,14 @@ export default function Navbar() {
                                       setShowNotifDropdown(false);
                                       if (item.type === "message") {
                                         await markMessageRead(item.id.replace("message-", ""));
+                                      } else if (item.dbId && item.unread) {
+                                        await markAsRead(item.dbId);
                                       }
-                                      router.push(item.href);
+                                      if (item.href && item.href !== "#") router.push(item.href);
                                     }}
                                     className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 last:border-0"
                                   >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${item.unread ? "bg-black text-white" : "bg-gray-50 text-gray-400"}`}>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
                                       <Icon size={14} />
                                     </div>
                                     <div className="flex-1 min-w-0">
