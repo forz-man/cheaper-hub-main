@@ -26,8 +26,8 @@ export async function GET(request) {
     // Check if user already reviewed this product
     const { data: existingReview } = await admin
       .from("reviews")
-      .select("id, rating, text, created_at")
-      .eq("user_id", user.id)
+      .select("id, rating, comment, created_at")
+      .eq("buyer_id", user.id)
       .eq("product_id", productId)
       .maybeSingle();
 
@@ -46,6 +46,7 @@ export async function GET(request) {
       .eq("product_id", String(productId));
 
     let hasDeliveredPurchase = false;
+    let eligibleOrderId = null;
     if (orderItems) {
       for (const item of orderItems) {
         if (item.fulfillment_status !== "delivered") continue;
@@ -59,6 +60,7 @@ export async function GET(request) {
 
         if (order) {
           hasDeliveredPurchase = true;
+          eligibleOrderId = order.id;
           break;
         }
       }
@@ -71,7 +73,7 @@ export async function GET(request) {
       });
     }
 
-    return NextResponse.json({ canReview: true, existingReview: null });
+    return NextResponse.json({ canReview: true, existingReview: null, orderId: eligibleOrderId });
   } catch (err) {
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }

@@ -517,7 +517,7 @@ create trigger on_product_update_pending
   execute function public.notify_admins_on_pending_update();
 
 -- ── Reviews ──────────────────────────────────────────────────────────────────
--- Buyers can leave one review per product after a delivered purchase.
+-- Buyers can leave one review per purchased item per order.
 -- rating: 1–5 integer enforced by CHECK constraint.
 -- order_item_id links to the specific delivered item (purchase proof).
 create table if not exists public.reviews (
@@ -527,9 +527,14 @@ create table if not exists public.reviews (
   order_item_id uuid references public.order_items(id) on delete set null,
   rating integer not null check (rating >= 1 and rating <= 5),
   text text,
-  created_at timestamptz default now(),
-  unique(user_id, product_id)
+  created_at timestamptz default now()
 );
+
+-- Allow one review per product per order (not one per product globally)
+-- so the same product bought in different orders can be reviewed each time.
+drop index if exists reviews_user_product_idx;
+create unique index if not exists reviews_user_product_order_idx
+  on public.reviews(user_id, product_id, coalesce(order_item_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 alter table public.reviews enable row level security;
 
