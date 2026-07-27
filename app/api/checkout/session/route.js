@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { getUncachableStripeClient } from "@/lib/stripeClient";
+import { shouldUseEscrow, createEscrowTransaction } from "@/lib/escrow";
 
 export async function POST(req) {
   try {
@@ -100,8 +101,38 @@ export async function POST(req) {
     const { error: itemsErr } = await supabase.from("order_items").insert(itemsPayload);
     if (itemsErr) throw itemsErr;
 
-    const stripe = await getUncachableStripeClient();
     const origin = req.headers.get("origin") || `https://${req.headers.get("host")}`;
+    const admin = createAdminClient();
+
+    // ── Route to Escrow.com for high-value orders ──────────────────────────
+    if (shouldUseEscrow(grandTotal)) {
+      const itemSummary = items_
+        .map((i) => `${i.name} x${i.qty}`)
+        .join(", ");
+
+      const { transactionId, redirectUrl } = await createEscrowTransaction({
+        orderId,
+        buyerEmail: shipping.email,
+        description: itemSummary,
+        amount: grandTotal,
+        returnUrl: `${origin}/order-success/${orderId}?payment_method=escrow`,
+      });
+
+      const { error: escrowSaveErr } = await admin
+        .from("orders")
+        .update({
+          payment_method: "escrow",
+          escrow_transaction_id: transactionId,
+          escrow_redirect_url: redirectUrl,
+        })
+        .eq("id", orderId);
+      if (escrowSaveErr) throw escrowSaveErr;
+
+      return NextResponse.json({ url: redirectUrl, orderId, paymentMethod: "escrow" });
+    }
+
+    // ── Stripe for orders below the threshold ──────────────────────────────
+    const stripe = await getUncachableStripeClient();
 
     const line_items = items_.map((item) => ({
       quantity: item.qty,
@@ -138,22 +169,19 @@ export async function POST(req) {
       success_url: `${origin}/order-success/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout?cancelled=1`,
       metadata: { order_id: orderId, buyer_id: user.id },
-      // Tags the resulting charge so vendor payouts (Stripe Transfers) can be
-      // traced back to this order and pulled from this charge's balance.
       payment_intent_data: { transfer_group: orderId },
     });
 
     // Buyers have no RLS update grant on orders (by design — see schema.sql),
     // so this trusted, server-generated session id is written via the
     // service-role admin client rather than the buyer's own session client.
-    const admin = createAdminClient();
     const { error: sessionSaveErr } = await admin
       .from("orders")
-      .update({ stripe_session_id: session.id })
+      .update({ stripe_session_id: session.id, payment_method: "stripe" })
       .eq("id", orderId);
     if (sessionSaveErr) throw sessionSaveErr;
 
-    return NextResponse.json({ url: session.url, orderId });
+    return NextResponse.json({ url: session.url, orderId, paymentMethod: "stripe" });
   } catch (err) {
     console.error("checkout/session error:", err);
     return NextResponse.json({ error: err?.message || "Checkout failed." }, { status: 500 });
