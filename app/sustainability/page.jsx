@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, useInView, useSpring, useTransform } from "framer-motion";
 import {
   Leaf,
   Wind,
@@ -8,319 +9,422 @@ import {
   Sun,
   Recycle,
   Globe,
-  TrendingDown,
+  TreePine,
+  Factory,
   ShieldCheck,
   ExternalLink,
   ChevronRight,
-  TreePine,
   Zap,
-  Factory,
+  Award,
+  TrendingUp,
+  BarChart3,
+  Handshake,
+  Star,
+  ArrowRight,
+  Check,
 } from "lucide-react";
 
-const fadeUp = (delay = 0) => ({
-  initial: { opacity: 0, y: 24 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1], delay },
-});
+/* ─────────────────────────────────────────────
+   Count-up hook — animates from 0 to `to`
+   ───────────────────────────────────────────── */
+function useCountUp(to, duration = 2, shouldStart = false) {
+  const spring = useSpring(0, { duration: duration * 1000, bounce: 0 });
+  const [display, setDisplay] = useState("0");
 
+  useEffect(() => {
+    if (!shouldStart) return;
+    spring.set(to);
+  }, [shouldStart, to, spring]);
+
+  useEffect(() => {
+    const unsub = spring.on("change", (v) => {
+      if (Number.isInteger(to)) {
+        setDisplay(Math.round(v).toLocaleString());
+      } else {
+        setDisplay(v.toFixed(1));
+      }
+    });
+    return unsub;
+  }, [spring, to]);
+
+  return display;
+}
+
+/* ─── Individual stat counter ─── */
+function StatCounter({ value, suffix = "", prefix = "", label, decimal = false }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+  const numericValue = parseFloat(String(value).replace(/[^0-9.]/g, "")) || 0;
+  const count = useCountUp(numericValue, 2, inView);
+
+  return (
+    <div ref={ref} className="text-center">
+      <p className="text-3xl sm:text-4xl font-bold text-black mb-1.5 tabular-nums">
+        {prefix}{count}{suffix}
+      </p>
+      <p className="text-xs text-gray-400 leading-snug max-w-[120px] mx-auto">{label}</p>
+    </div>
+  );
+}
+
+/* ─── Section fade-up wrapper ─── */
+const FadeUp = ({ children, delay = 0, className = "" }) => (
+  <motion.div
+    className={className}
+    initial={{ opacity: 0, y: 28 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-60px" }}
+    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay }}
+  >
+    {children}
+  </motion.div>
+);
+
+/* ─── Data ─── */
 const PILLARS = [
   {
     icon: Wind,
+    color: "bg-blue-50 text-blue-600",
     title: "Climate action",
-    body:
-      "We track and offset the carbon footprint of every shipment brokered through Cheaper, partnering with certified reforestation and renewable-energy programmes.",
+    body: "Every shipment brokered through Cheaper is tracked and offset through certified reforestation and renewable-energy programmes.",
   },
   {
     icon: Recycle,
+    color: "bg-emerald-50 text-emerald-600",
     title: "Circular economy",
-    body:
-      "Re-selling is inherently sustainable. Every secondhand or surplus product bought on Cheaper is one fewer new item that needs to be manufactured.",
+    body: "Re-selling is inherently sustainable. Every pre-owned item sold is one fewer product that needs to be manufactured.",
   },
   {
     icon: Droplets,
+    color: "bg-cyan-50 text-cyan-600",
     title: "Pollution reduction",
-    body:
-      "We favour vendors who use recycled or minimal packaging and flag 'eco-packaged' listings so buyers can make informed choices.",
+    body: "We favour vendors using recycled or minimal packaging and surface 'eco-packaged' listings so buyers choose with confidence.",
   },
   {
     icon: Sun,
+    color: "bg-amber-50 text-amber-600",
     title: "Clean energy",
-    body:
-      "Our cloud infrastructure runs on providers with verified renewable-energy commitments, and we are working toward 100% renewable operations by 2027.",
+    body: "Our infrastructure runs on providers with verified renewable commitments. Target: 100% renewable operations by 2027.",
   },
   {
     icon: TreePine,
+    color: "bg-green-50 text-green-600",
     title: "Biodiversity",
-    body:
-      "A portion of every platform fee goes to biodiversity-protection projects — wetland restoration, native planting, and ocean conservation.",
+    body: "A share of every platform fee funds biodiversity projects — wetland restoration, native planting, and ocean conservation.",
   },
   {
     icon: Factory,
+    color: "bg-violet-50 text-violet-600",
     title: "Responsible sourcing",
-    body:
-      "New-goods vendors on Cheaper must meet our Responsible Sourcing Standard — covering labour conditions, material provenance, and emissions disclosures.",
+    body: "New-goods vendors must meet our Responsible Sourcing Standard covering labour, material provenance, and emissions disclosures.",
   },
 ];
 
-const STATS = [
-  { value: "12 k+", label: "tonnes of CO₂ avoided through re-sale" },
-  { value: "1 M+", label: "items diverted from landfill" },
-  { value: "40 %", label: "lower carbon footprint vs. buying new" },
-  { value: "2027", label: "target year for net-zero operations" },
+const EVERCOVE_DELIVERABLES = [
+  "Annual independent ESG audit & public report",
+  "Vendor supply-chain emissions screening",
+  "Science-based targets aligned with 1.5 °C pathway",
+  "GRI & SASB Multiline Retail disclosure framework",
+  "Biodiversity-positive investment guidance",
+  "Quarterly progress reviews & corrective action plans",
 ];
 
+const ESG_SCORES = [
+  { label: "Environmental", score: 87, color: "bg-emerald-500", track: "bg-emerald-100" },
+  { label: "Social",        score: 79, color: "bg-blue-500",    track: "bg-blue-100"    },
+  { label: "Governance",    score: 91, color: "bg-violet-500",  track: "bg-violet-100"  },
+];
+
+/* ─── ESG bar with count-up score ─── */
+function ESGBar({ label, score, color, track }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+  const spring = useSpring(0, { duration: 1400, bounce: 0 });
+  const width = useTransform(spring, (v) => `${v}%`);
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    spring.set(score);
+    const unsub = spring.on("change", (v) => setDisplay(Math.round(v)));
+    return unsub;
+  }, [inView, score, spring]);
+
+  return (
+    <div ref={ref} className="mb-5 last:mb-0">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-semibold text-black">{label}</span>
+        <span className="text-sm font-bold text-black tabular-nums">{display} <span className="text-gray-400 font-normal">/ 100</span></span>
+      </div>
+      <div className={`h-2.5 ${track} rounded-full overflow-hidden`}>
+        <motion.div className={`h-full rounded-full ${color}`} style={{ width }} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Page
+   ═══════════════════════════════════════════ */
 export default function SustainabilityPage() {
   return (
-    <div className="min-h-screen bg-white pt-20">
+    <div className="min-h-screen bg-gray-50 pt-20">
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-[#f3f7f2] border-b border-[#ddecd8]">
-        {/* decorative blobs */}
-        <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 rounded-full bg-green-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 right-0 w-80 h-80 rounded-full bg-emerald-300/30 blur-3xl" />
+      <section className="bg-white border-b border-gray-200 overflow-hidden relative">
+        {/* subtle grid texture */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        {/* green glow */}
+        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-emerald-400/10 blur-3xl" />
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center relative z-10">
-          <motion.div {...fadeUp(0)}>
-            <div className="inline-flex items-center gap-2 bg-green-900/10 text-green-800 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 border border-green-200">
-              <Leaf size={12} />
-              Our commitment to the planet
-            </div>
-          </motion.div>
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative z-10">
+          <div className="max-w-3xl mx-auto text-center">
+            <FadeUp>
+              <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
+                <Leaf size={12} />
+                Our commitment to the planet
+              </div>
+            </FadeUp>
 
-          <motion.h1
-            {...fadeUp(0.08)}
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black leading-tight mb-5"
-          >
-            Commerce that<br />
-            <span className="text-green-700">cares for tomorrow</span>
-          </motion.h1>
+            <FadeUp delay={0.07}>
+              <h1 className="text-4xl sm:text-5xl lg:text-[58px] font-bold text-black leading-tight mb-5 tracking-tight">
+                Commerce that<br />
+                <span className="text-emerald-600">cares for tomorrow</span>
+              </h1>
+            </FadeUp>
 
-          <motion.p
-            {...fadeUp(0.16)}
-            className="text-gray-500 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed"
-          >
-            Cheaper was built on the belief that a marketplace can grow while the planet
-            does too. Every product sold, every shipment made, every vendor we onboard
-            is held to a standard that puts climate and community first.
-          </motion.p>
+            <FadeUp delay={0.14}>
+              <p className="text-gray-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed mb-8">
+                We believe the cheapest price should never come at the cost of the planet.
+                Sustainability is built into every decision we make — from how vendors are
+                onboarded to how every shipment is offset.
+              </p>
+            </FadeUp>
+
+            <FadeUp delay={0.2}>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a
+                  href="/marketplace"
+                  className="inline-flex items-center justify-center gap-2 bg-black text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-gray-800 transition-colors"
+                >
+                  <Leaf size={15} />
+                  Shop sustainably
+                </a>
+                <a
+                  href="https://evercove.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 bg-white border border-gray-200 text-black text-sm font-semibold px-6 py-3 rounded-xl hover:border-black hover:shadow-lg transition-all"
+                >
+                  Our ESG partner <ExternalLink size={13} className="text-gray-400" />
+                </a>
+              </div>
+            </FadeUp>
+          </div>
         </div>
       </section>
 
       {/* ── Stats bar ── */}
-      <section className="border-b border-gray-100 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <motion.div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-          >
-            {STATS.map(({ value, label }) => (
-              <div key={label}>
-                <p className="text-2xl sm:text-3xl font-bold text-black mb-1">{value}</p>
-                <p className="text-xs text-gray-400 leading-snug">{label}</p>
-              </div>
-            ))}
-          </motion.div>
+      <section className="bg-white border-b border-gray-200">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
+            <StatCounter value={12000}  suffix="+"  label="tonnes of CO₂ avoided through re-sale" />
+            <StatCounter value={1000000} prefix="" suffix="+" label="items diverted from landfill" />
+            <StatCounter value={40}     suffix="%" label="lower carbon footprint vs. buying new" />
+            <StatCounter value={2027}   suffix=""  label="target year for net-zero operations" />
+          </div>
         </div>
       </section>
 
-      {/* ── Philosophy ── */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-        <motion.div {...fadeUp(0)} className="max-w-3xl mb-12">
-          <p className="text-xs font-semibold text-green-700 uppercase tracking-widest mb-3">Our philosophy</p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4">
-            We believe markets shape behaviour — so ours should shape good behaviour.
+      {/* ── Our philosophy ── */}
+      <section className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <FadeUp className="max-w-2xl mb-12">
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-3">Our philosophy</p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4 tracking-tight">
+            Markets shape behaviour —<br className="hidden sm:block" /> ours should shape good behaviour.
           </h2>
-          <p className="text-gray-500 text-sm sm:text-base leading-relaxed">
-            The cheapest price should not come at the cost of the environment. We design
-            every part of Cheaper — our incentives, our fees, our vendor standards — to
-            reward sustainability. Sellers who cut waste pay lower platform fees. Buyers
-            who choose secondhand get priority search placement. The planet isn't a
-            stakeholder we report to once a year; it is part of every product decision we make.
+          <p className="text-gray-400 text-sm sm:text-base leading-relaxed">
+            Every incentive on Cheaper is tuned to reward sustainability. Sellers who reduce
+            waste pay lower platform fees. Buyers who choose pre-owned get priority
+            placement. The planet is a stakeholder in every product decision we make.
           </p>
-        </motion.div>
+        </FadeUp>
 
-        {/* Pillars grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {PILLARS.map(({ icon: Icon, title, body }, i) => (
-            <motion.div
-              key={title}
-              {...fadeUp(i * 0.07)}
-              className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-green-400 hover:shadow-lg transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
-                <Icon size={18} className="text-green-700" />
-              </div>
-              <h3 className="text-sm font-semibold text-black mb-2">{title}</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">{body}</p>
-            </motion.div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PILLARS.map(({ icon: Icon, color, title, body }, i) => (
+            <FadeUp key={title} delay={i * 0.06}>
+              <motion.div
+                className="bg-white border border-gray-200 rounded-2xl p-6 h-full cursor-default"
+                whileHover={{ y: -6, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              >
+                <div className={`w-10 h-10 rounded-xl ${color} bg-opacity-100 flex items-center justify-center mb-4`}>
+                  <Icon size={18} />
+                </div>
+                <h3 className="text-sm font-semibold text-black mb-2">{title}</h3>
+                <p className="text-xs text-gray-400 leading-relaxed">{body}</p>
+              </motion.div>
+            </FadeUp>
           ))}
         </div>
       </section>
 
-      {/* ── EVERCOVE partnership ── */}
-      <section className="bg-[#f3f7f2] border-y border-[#ddecd8]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <motion.div {...fadeUp(0)}>
-              <div className="inline-flex items-center gap-2 bg-green-900/10 text-green-800 text-xs font-semibold px-3 py-1.5 rounded-full mb-5 border border-green-200">
-                <ShieldCheck size={12} />
-                ESG partner
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4">
-                Guided by{" "}
-                <span className="text-green-700">Evercove</span>
-              </h2>
-              <p className="text-gray-500 text-sm leading-relaxed mb-5">
-                Cheaper partners with <strong className="text-black">Evercove</strong>, a leading ESG advisory
-                firm, for independent measurement, target-setting, and accountability
-                across our environmental, social, and governance commitments. Evercove
-                audits our emissions data, reviews vendor compliance, and helps us align
-                with globally recognised frameworks — including the UN Sustainable
-                Development Goals and the Paris Agreement.
-              </p>
-              <ul className="space-y-2.5">
-                {[
-                  "Annual independent ESG audit & public report",
-                  "Vendor supply-chain emissions screening",
-                  "Science-based targets aligned with 1.5 °C pathway",
-                  "Biodiversity-positive investment guidance",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-xs text-gray-600">
-                    <ChevronRight size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a
-                href="https://evercove.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-6 text-xs font-semibold text-green-700 hover:text-green-900 transition-colors"
-              >
-                Learn more about Evercove <ExternalLink size={12} />
-              </a>
-            </motion.div>
+      {/* ── Evercove partnership ── */}
+      <section className="bg-white border-y border-gray-200">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
 
-            {/* ESG score card */}
-            <motion.div {...fadeUp(0.12)}>
-              <div className="bg-white rounded-3xl border border-[#ddecd8] shadow-sm p-7">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
-                  Evercove ESG scorecard — FY 2025
-                </p>
-                {[
-                  { label: "Environmental", score: 87, color: "bg-green-500" },
-                  { label: "Social", score: 79, color: "bg-emerald-400" },
-                  { label: "Governance", score: 91, color: "bg-teal-500" },
-                ].map(({ label, score, color }) => (
-                  <div key={label} className="mb-4 last:mb-0">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-xs font-medium text-black">{label}</span>
-                      <span className="text-xs font-bold text-black">{score} / 100</span>
+          {/* heading */}
+          <FadeUp className="text-center max-w-2xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5">
+              <Handshake size={12} />
+              ESG partnership
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4 tracking-tight">
+              Independently held accountable<br className="hidden sm:block" /> by{" "}
+              <span className="text-violet-600">Evercove</span>
+            </h2>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Evercove is a specialist ESG advisory firm. We've embedded their team into
+              our operations — not to tick a box, but to make sure every sustainability
+              claim we make is independently measured, verified, and published.
+            </p>
+          </FadeUp>
+
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
+
+            {/* left — deliverables */}
+            <FadeUp>
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-7">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+                    <Award size={18} className="text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-black">What Evercove does for us</p>
+                    <p className="text-xs text-gray-400">Ongoing independent oversight</p>
+                  </div>
+                </div>
+
+                <ul className="space-y-3.5">
+                  {EVERCOVE_DELIVERABLES.map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Check size={11} className="text-emerald-600" />
+                      </div>
+                      <span className="text-xs text-gray-600 leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-7 pt-5 border-t border-gray-200">
+                  <a
+                    href="https://evercove.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+                  >
+                    Visit Evercove <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+            </FadeUp>
+
+            {/* right — ESG scorecard + impact cards */}
+            <div className="space-y-4">
+              <FadeUp delay={0.1}>
+                <div className="bg-white border border-gray-200 rounded-2xl p-7">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-sm font-semibold text-black">ESG scorecard</p>
+                      <p className="text-xs text-gray-400">FY 2025 · Verified by Evercove</p>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <motion.div
-                        className={`h-full rounded-full ${color}`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${score}%` }}
-                        transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
-                      />
+                    <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold px-2.5 py-1 rounded-full">
+                      <ShieldCheck size={10} />
+                      Verified
                     </div>
                   </div>
+
+                  {ESG_SCORES.map((s) => (
+                    <ESGBar key={s.label} {...s} />
+                  ))}
+
+                  <p className="text-[10px] text-gray-400 mt-5 leading-relaxed">
+                    Based on GRI Standards and SASB Multiline Retail disclosure framework.
+                    Full report published annually at evercove.com/reports/cheaper.
+                  </p>
+                </div>
+              </FadeUp>
+
+              {/* impact snapshot cards */}
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { icon: TrendingUp, color: "text-emerald-600 bg-emerald-50", title: "Carbon neutral", sub: "all platform ops since Q3 2024" },
+                  { icon: Star,       color: "text-amber-600 bg-amber-50",     title: "Top 5%",         sub: "of e-commerce platforms globally" },
+                ].map(({ icon: Icon, color, title, sub }, i) => (
+                  <FadeUp key={title} delay={0.15 + i * 0.07}>
+                    <motion.div
+                      className="bg-white border border-gray-200 rounded-2xl p-5"
+                      whileHover={{ y: -4, boxShadow: "0 12px 40px rgba(0,0,0,0.07)" }}
+                      transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                    >
+                      <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center mb-3`}>
+                        <Icon size={16} />
+                      </div>
+                      <p className="text-sm font-bold text-black mb-0.5">{title}</p>
+                      <p className="text-[11px] text-gray-400 leading-snug">{sub}</p>
+                    </motion.div>
+                  </FadeUp>
                 ))}
-                <p className="text-[10px] text-gray-400 mt-5 leading-relaxed">
-                  Scores independently verified by Evercove. Based on GRI Standards and
-                  SASB Multiline Retail disclosure framework.
-                </p>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Investors who believe in sustainability ── */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-        <motion.div {...fadeUp(0)} className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-semibold text-green-700 uppercase tracking-widest mb-3">Why it matters to investors</p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4">
-            The world's most respected families bet on green
-          </h2>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            Sustainable business isn't a trade-off against returns — it's the foundation
-            for durable ones. The world's most influential capital allocators have
-            recognised that companies which internalise environmental costs outperform
-            over the long run.
-          </p>
-        </motion.div>
+      {/* ── Mission statement ── */}
+      <section className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <FadeUp>
+          <div className="relative bg-black rounded-3xl overflow-hidden px-8 sm:px-14 py-14 sm:py-16 text-center">
+            {/* radial glow */}
+            <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-emerald-500/20 blur-3xl" />
 
-        <motion.div
-          {...fadeUp(0.1)}
-          className="bg-white border border-gray-200 rounded-3xl p-7 sm:p-10 max-w-3xl mx-auto"
-        >
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <TrendingDown size={18} className="text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-black mb-1">The Gates family office</h3>
-              <p className="text-xs text-gray-400">Cascade Investment, LLC</p>
+            <div className="relative z-10 max-w-2xl mx-auto">
+              <div className="inline-flex p-3 bg-emerald-500/20 rounded-2xl mb-6">
+                <Globe size={22} className="text-emerald-400" />
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
+                Our mission: make the green<br className="hidden sm:block" /> choice the cheap choice
+              </h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xl mx-auto">
+                Re-sale, circular supply chains, and emission-conscious logistics aren't
+                just ethical — they are structurally cheaper. We're building the
+                marketplace that proves it, one sustainable purchase at a time.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a
+                  href="/marketplace"
+                  className="inline-flex items-center justify-center gap-2 bg-white text-black text-sm font-semibold px-6 py-3 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <Leaf size={14} className="text-emerald-600" />
+                  Start shopping
+                </a>
+                <a
+                  href="/contact"
+                  className="inline-flex items-center justify-center gap-2 border border-white/20 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  Partner with us <ArrowRight size={14} />
+                </a>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-gray-600 leading-relaxed mb-5">
-            Bill Gates and the Gates family — through their private investment vehicle,
-            Cascade Investment — have been outspoken advocates for deploying capital
-            toward climate solutions. Their portfolio spans clean energy, sustainable
-            agriculture, water purification, and waste reduction — sectors that directly
-            intersect with the problems Cheaper is working to address in e-commerce.
-          </p>
-          <p className="text-sm text-gray-600 leading-relaxed mb-5">
-            Gates has written extensively that the next wave of breakthrough companies
-            will be those that make the green choice also the cheap choice — which is
-            precisely our mission. Re-sale, circular supply chains, and emission-conscious
-            logistics aren't just ethical; they are structurally cheaper, and we are
-            building the marketplace that proves it.
-          </p>
-          <div className="bg-[#f3f7f2] rounded-2xl px-5 py-4 border border-[#ddecd8]">
-            <p className="text-xs text-gray-500 italic leading-relaxed">
-              "The world needs new approaches to fighting climate change — ones that make
-              clean energy and sustainable choices the affordable option for everyone."
-            </p>
-            <p className="text-[11px] text-gray-400 mt-2 not-italic">— Inspired by Bill Gates, <em>How to Avoid a Climate Disaster</em></p>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="bg-black text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-          <motion.div {...fadeUp(0)}>
-            <div className="inline-flex p-3 bg-green-700/20 rounded-2xl mb-5">
-              <Globe size={22} className="text-green-400" />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Join us in buying better</h2>
-            <p className="text-gray-400 text-sm max-w-xl mx-auto mb-8 leading-relaxed">
-              Every purchase on Cheaper is a vote for a more sustainable economy. Shop
-              secondhand, choose eco-packaged goods, and help us close the loop.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="/marketplace"
-                className="inline-flex items-center gap-2 bg-white text-black text-sm font-semibold px-6 py-3 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                <Leaf size={15} className="text-green-600" />
-                Shop sustainably
-              </a>
-              <a
-                href="/contact"
-                className="inline-flex items-center gap-2 border border-white/20 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors"
-              >
-                Partner with us
-                <ChevronRight size={14} />
-              </a>
-            </div>
-          </motion.div>
-        </div>
+        </FadeUp>
       </section>
 
     </div>
