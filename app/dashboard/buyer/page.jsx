@@ -145,7 +145,7 @@ export default function BuyerDashboard() {
     setOrdersLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, status, total, created_at, order_items(id, product_id, product_name, vendor_name, qty, price)")
+      .select("id, status, payment_status, total, created_at, buyer_confirmed_at, order_items(id, product_id, product_name, vendor_name, qty, price)")
       .eq("buyer_id", uid)
       .order("created_at", { ascending: false });
 
