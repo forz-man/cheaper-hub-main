@@ -8,7 +8,7 @@ import {
   ShoppingBag, Heart, Bell, Home, Package, Store,
   Tag, HelpCircle, Settings, ChevronDown, ShoppingCart,
   TrendingUp, Sparkles, Layers, Megaphone,
-  BadgePercent, AlertCircle, CheckCircle2, XCircle
+  BadgePercent, AlertCircle, CheckCircle2, XCircle, Leaf
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import useNotifications from "@/hooks/useNotifications";
@@ -176,10 +176,11 @@ export default function Navbar() {
   // "Sell" is only shown to visitors who haven't signed up yet.
   // Buyers don't need it (they're buyers). Vendors are already selling.
   const navLinks = [
-    { label: "Home",        href: "/",           icon: Home,         id: "home"        },
-    { label: "Marketplace", href: "/marketplace", icon: Package,      id: "marketplace" },
-    { label: "Deals",       href: "/deals",       icon: BadgePercent, id: "deals"       },
-    { label: "Contact",     href: "/contact",     icon: Megaphone,    id: "contact"     },
+    { label: "Home",           href: "/",              icon: Home,         id: "home"           },
+    { label: "Marketplace",    href: "/marketplace",   icon: Package,      id: "marketplace"    },
+    { label: "Deals",          href: "/deals",         icon: BadgePercent, id: "deals"          },
+    { label: "Sustainability", href: "/sustainability", icon: Leaf,         id: "sustainability" },
+    { label: "Contact",        href: "/contact",       icon: Megaphone,    id: "contact"        },
   ];
 
   return (

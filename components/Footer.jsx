@@ -47,6 +47,7 @@ const Footer = () => {
       { label: "Returns Policy", href: "/returns" },
     ],
     "Company": [
+      { label: "Sustainability", href: "/sustainability" },
       { label: "Careers", href: "/careers" },
       { label: "Press Kit", href: "/press" },
     ],

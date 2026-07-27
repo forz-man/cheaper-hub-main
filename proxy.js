@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = new Set([
   "/auth/callback",
   "/api/auth/callback",
   "/contact",
+  "/sustainability",
   "/api/products",
   "/api/reviews",
 ]);
