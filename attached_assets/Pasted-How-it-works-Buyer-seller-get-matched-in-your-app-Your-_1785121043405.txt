@@ -1,0 +1,49 @@
+How it works
+Buyer/seller get matched in your app
+Your backend makes ONE API call to Escrow Pay with the deal details + a return_url
+Escrow.com returns a URL — redirect the buyer there
+Buyer registers, verifies identity, and pays on Escrow.com's hosted wizard
+Buyer is redirected back to your return_url when done
+You poll or webhook-listen for transaction status to update your DB
+
+Base URLs:
+
+Sandbox: https://api.escrow-sandbox.com/2017-09-01/
+Production: https://api.escrow.com/2017-09-01/
+Auth: HTTP Basic, using your Escrow.com account email as username and your API key as password
+Prompt to paste into Replit AI / Replit Agent
+I'm building a peer-to-peer marketplace in Next.js (App Router) and have partner
+API access to Escrow.com. I want to use the Escrow Pay API (hosted redirect flow)
+so buyers pay by card without me handling raw wire transfers.
+
+Set up:
+- lib/escrow.ts with a helper function that calls the Escrow Pay endpoint using
+  HTTP Basic Auth (email + API key from env vars ESCROW_EMAIL and ESCROW_API_KEY),
+  pointed at the sandbox URL by default (https://api.escrow-sandbox.com/2017-09-01/)
+  with an env flag to switch to production (https://api.escrow.com/2017-09-01/)
+
+- app/api/transactions/create/route.ts
+  - POST route that takes { itemTitle, itemDescription, priceCents, buyerEmail,
+    sellerEmail, transactionId }
+  - calls the Escrow Pay endpoint to create the transaction, passing a return_url
+    like https://your-app.com/transactions/{transactionId}/complete
+  - saves the returned escrow transaction id + redirect URL against my internal
+    transactionId in the database (status: "pending_payment")
+  - returns the redirect URL to the frontend so I can send the buyer to it
+
+- app/api/transactions/[id]/status/route.ts
+  - GET route that calls GET /transaction/{escrowTransactionId} on the Escrow API
+  - returns the current status (e.g. pending, in_escrow, released, disputed)
+  - updates my internal transaction record to match
+
+- app/api/webhooks/escrow/route.ts
+  - POST route to receive Escrow.com transaction status change notifications
+  - verifies the request is genuinely from Escrow.com (check their docs for
+    their specific verification method) before trusting it
+  - updates my internal transaction record based on the new status
+
+- A basic transactions table/schema with: id, escrow_transaction_id, buyer_email,
+  seller_email, item_title, price_cents, status, created_at, updated_at
+
+Use TypeScript throughout and handle errors from the Escrow API gracefully
+(their errors come back with proper HTTP status codes).

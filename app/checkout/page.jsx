@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ShoppingBag, Trash2, Package, Shield,
-  Truck, CreditCard, Loader2, ChevronRight, Minus, Plus,
+  Truck, CreditCard, Loader2, ChevronRight, Minus, Plus, Lock,
 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { supabase } from "@/lib/supabase";
+
+const ESCROW_THRESHOLD = 500;
 
 const COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Netherlands"];
 
@@ -252,15 +254,44 @@ export default function CheckoutPage() {
 
             {/* Payment */}
             <div className="bg-white border border-[#e2ddd6] rounded-2xl p-6">
-              <h2 className="text-sm font-semibold text-[#111] mb-2 flex items-center gap-2">
-                <CreditCard size={15} className="text-[#888]" /> Payment
+              <h2 className="text-sm font-semibold text-[#111] mb-4 flex items-center gap-2">
+                <CreditCard size={15} className="text-[#888]" /> Payment method
               </h2>
-              <p className="text-sm text-[#888]">
-                You&rsquo;ll enter your card details on Stripe&rsquo;s secure checkout page after clicking &ldquo;Continue to payment&rdquo; below.
-              </p>
-              <p className="text-[10px] text-[#bbb] mt-3 flex items-center gap-1">
-                <Shield size={10} /> Payments processed securely by Stripe. Card data never touches our servers.
-              </p>
+
+              {grandTotal >= ESCROW_THRESHOLD ? (
+                /* ── Escrow path ────────────────────────────────────────────── */
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full">
+                      <Shield size={11} /> Escrow.com
+                    </span>
+                    <span className="text-xs text-[#aaa]">Large-order protection</span>
+                  </div>
+                  <p className="text-sm text-[#888] mb-3">
+                    Orders over ${ESCROW_THRESHOLD} are processed through Escrow.com. You&apos;ll be redirected to their secure hosted checkout to pay and verify your identity.
+                  </p>
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700 space-y-1">
+                    <div className="flex items-start gap-1.5"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Funds held in escrow until both you and the seller confirm delivery</div>
+                    <div className="flex items-start gap-1.5"><Shield size={10} className="mt-0.5 flex-shrink-0" /> 3-day inspection window after delivery before funds are released</div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Stripe path ────────────────────────────────────────────── */
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-full">
+                      <CreditCard size={11} /> Card payment · Stripe
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#888] mb-3">
+                    You&apos;ll enter your card details on Stripe&apos;s secure checkout page. Your card is charged immediately, but payment is held by us until delivery is confirmed.
+                  </p>
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 space-y-1">
+                    <div className="flex items-start gap-1.5"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Money held with Cheaper until both you and the seller confirm delivery</div>
+                    <div className="flex items-start gap-1.5"><Shield size={10} className="mt-0.5 flex-shrink-0" /> Card data never touches our servers — secured by Stripe</div>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

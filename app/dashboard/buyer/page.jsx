@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingBag, Heart, Settings, LogOut,
   Package, Star, ArrowUpRight, ChevronRight,
   X, CheckCircle, Truck, Clock, Store, Loader2,
-  Search,
+  Search, Shield, Lock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
@@ -137,15 +137,35 @@ export default function BuyerDashboard() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitError, setReviewSubmitError] = useState("");
 
+  const [confirmingOrderId, setConfirmingOrderId] = useState(null);
+  const [confirmError, setConfirmError] = useState(null);
+
   function eligibilityKey(orderId, productId) {
     return `${orderId}_${productId}`;
+  }
+
+  async function handleConfirmDelivery(orderId) {
+    setConfirmingOrderId(orderId);
+    setConfirmError(null);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/confirm-delivery`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to confirm delivery");
+      // Refresh order list to show updated state
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) await loadOrders(u.id);
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setConfirmingOrderId(null);
+    }
   }
 
   async function loadOrders(uid) {
     setOrdersLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, status, payment_status, total, created_at, buyer_confirmed_at, order_items(id, product_id, product_name, vendor_name, qty, price)")
+      .select("id, status, payment_status, payment_method, total, created_at, buyer_confirmed_at, payouts_released_at, order_items(id, product_id, product_name, vendor_name, qty, price, payout_status)")
       .eq("buyer_id", uid)
       .order("created_at", { ascending: false });
 
@@ -434,10 +454,18 @@ export default function BuyerDashboard() {
                 </motion.div>
               ) : (
                 <div className="space-y-3">
+                  {confirmError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                      {confirmError}
+                    </div>
+                  )}
                   {filteredOrders.map((order) => {
                     const sc = statusConfig[normStatus(order.status)] || statusConfig.processing;
                     const StatusIcon = sc.Icon;
                     const firstItem = order.order_items?.[0];
+                    const canConfirm = !order.buyer_confirmed_at && order.payment_status === "paid" && ["shipped", "delivered"].includes(normStatus(order.status));
+                    const allReleased = order.order_items?.length > 0 && order.order_items.every(i => i.payout_status === "released");
+                    const isEscrowOrder = order.payment_method === "escrow";
                     return (
                       <div key={order.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                         <div className="flex items-start justify-between gap-4">
@@ -457,6 +485,11 @@ export default function BuyerDashboard() {
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${sc.color}`}>
                                   <StatusIcon size={10} /> {sc.label}
                                 </span>
+                                {isEscrowOrder && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 border-amber-100 text-amber-700">
+                                    <Shield size={9} /> Escrow
+                                  </span>
+                                )}
                                 <span className="text-[10px] text-gray-300">{formatDate(order.created_at)}</span>
                                 {normStatus(order.status) === "delivered" && firstItem?.product_id && (() => {
                                   const ek = eligibilityKey(order.id, firstItem.product_id);
@@ -486,6 +519,44 @@ export default function BuyerDashboard() {
                             <div className="text-[10px] text-gray-300 font-mono mt-1">#{order.id.slice(0, 8)}</div>
                           </div>
                         </div>
+
+                        {/* Payment hold / payout status banner */}
+                        {order.payment_status === "paid" && !isEscrowOrder && (
+                          <div className={`mt-3 rounded-xl px-3 py-2.5 text-xs flex items-start gap-2 ${
+                            allReleased
+                              ? "bg-emerald-50 border border-emerald-100 text-emerald-700"
+                              : order.buyer_confirmed_at
+                              ? "bg-blue-50 border border-blue-100 text-blue-700"
+                              : "bg-indigo-50 border border-indigo-100 text-indigo-700"
+                          }`}>
+                            <Lock size={10} className="mt-0.5 flex-shrink-0" />
+                            <span>
+                              {allReleased
+                                ? "Payment released to seller — order complete."
+                                : order.buyer_confirmed_at
+                                ? "You've confirmed receipt. Payment will be released once the seller marks delivery."
+                                : canConfirm
+                                ? "Payment is held by Cheaper. Confirm receipt below to release it to the seller."
+                                : "Payment held by Cheaper until delivery is confirmed by both parties."}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Confirm delivery button */}
+                        {canConfirm && !isEscrowOrder && (
+                          <button
+                            onClick={() => handleConfirmDelivery(order.id)}
+                            disabled={confirmingOrderId === order.id}
+                            className="mt-3 w-full flex items-center justify-center gap-2 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {confirmingOrderId === order.id ? (
+                              <><Loader2 size={14} className="animate-spin" /> Confirming…</>
+                            ) : (
+                              <><CheckCircle size={14} /> Confirm I received this order</>
+                            )}
+                          </button>
+                        )}
+
                         {order.order_items?.length > 1 && (
                           <div className="mt-3 pt-3 border-t border-gray-50 space-y-1">
                             {order.order_items.slice(1).map((item, i) => (

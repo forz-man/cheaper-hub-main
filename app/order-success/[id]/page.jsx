@@ -223,8 +223,8 @@ function OrderSuccessContent({ id }) {
           <p className="text-sm text-[#888] mb-6">
             Thanks, {name.split(" ")[0]}.{" "}
             {isEscrow
-              ? "Your payment is held in escrow and will be released to the seller after delivery."
-              : "Your order is confirmed and being processed."}
+              ? "Your payment is held in escrow and will be released to the seller after delivery is confirmed."
+              : "Your card has been charged and the funds are held by Cheaper. Payment is released to the seller only after both you and the seller confirm delivery."}
           </p>
 
           <div className="bg-[#f9f8f6] border border-[#e2ddd6] rounded-xl p-5 mb-6 text-left space-y-3">
@@ -275,10 +275,21 @@ function OrderSuccessContent({ id }) {
             </div>
           </div>
 
+          {/* Payment hold notice */}
+          {!isEscrow && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5 text-left flex items-start gap-2.5">
+              <Shield size={14} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-indigo-700 leading-relaxed">
+                <span className="font-semibold">Your payment is held by Cheaper.</span>{" "}
+                Once the seller ships and marks delivery, go to <strong>My Orders</strong> in your dashboard and tap <strong>&ldquo;Confirm I received this order&rdquo;</strong> — that releases payment to the seller.
+              </p>
+            </div>
+          )}
+
           <p className="text-xs text-[#aaa] mb-6">
             {isEscrow
               ? "Funds are held securely in escrow. You'll confirm delivery before payment is released to the seller."
-              : "You'll receive an email confirmation when your order ships."}
+              : "You'll get a notification when your order ships."}
           </p>
 
           <div className="flex flex-col gap-3">

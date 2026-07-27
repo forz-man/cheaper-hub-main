@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
+import { attemptPayoutRelease } from "@/lib/payouts";
 
 const VALID_TRANSITIONS = {
   processing: ["shipped", "cancelled"],
@@ -11,12 +12,9 @@ const VALID_TRANSITIONS = {
 
 // PATCH /api/orders/[id]/items/[itemId]   { fulfillment_status: "shipped" | "delivered" | "cancelled" }
 //
-// Money stays in the platform's own Stripe balance from checkout onward
-// (no Stripe Connect destination charges are used). This route only updates
-// bookkeeping: once a vendor marks their item "delivered" on a paid order,
-// their share is marked payout_status = "released" so it shows up as owed
-// to them. Actual bank transfer to the vendor happens outside this app
-// until a payout method (e.g. Stripe Connect) is wired up.
+// When a vendor marks their item "delivered" AND the buyer has already
+// confirmed receipt, payouts are released automatically via attemptPayoutRelease().
+// If the buyer hasn't confirmed yet, the payout stays pending until they do.
 export async function PATCH(request, { params }) {
   try {
     const supabase = await createClient();
@@ -52,10 +50,13 @@ export async function PATCH(request, { params }) {
 
     const currentStatus = item.fulfillment_status || "processing";
     const allowed = VALID_TRANSITIONS[currentStatus] || [];
-    // Special case: allow re-running "delivered" on an already-delivered item
-    // whose payout is still pending, so a failed/held transfer can be retried
-    // without faking a fulfillment status change.
-    const isPayoutRetry = newStatus === "delivered" && currentStatus === "delivered" && item.payout_status !== "released";
+    // Allow re-running "delivered" on an already-delivered item whose payout
+    // is still pending so a failed transfer can be retried.
+    const isPayoutRetry =
+      newStatus === "delivered" &&
+      currentStatus === "delivered" &&
+      item.payout_status !== "released";
+
     if (!allowed.includes(newStatus) && !isPayoutRetry) {
       return NextResponse.json(
         { error: `Cannot move from "${currentStatus}" to "${newStatus}"` },
@@ -63,11 +64,7 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const update = { fulfillment_status: newStatus };
-
-    // When a vendor marks an item delivered, verify the order was paid but
-    // do NOT auto-transfer funds. Payouts are held until the buyer also
-    // confirms receipt and an admin releases them via the admin dashboard.
+    // If marking delivered, confirm the order is paid before proceeding
     if (newStatus === "delivered") {
       const { data: order, error: orderErr } = await admin
         .from("orders")
@@ -84,12 +81,12 @@ export async function PATCH(request, { params }) {
           { status: 422 }
         );
       }
-      // payout_status stays "pending" — admin releases it after buyer confirms.
     }
 
+    // Update fulfillment status
     const { data: updated, error: updateErr } = await admin
       .from("order_items")
-      .update(update)
+      .update({ fulfillment_status: newStatus })
       .eq("id", itemId)
       .select("id, fulfillment_status, payout_status, payout_amount, payout_released_at, stripe_transfer_id")
       .single();
@@ -99,7 +96,30 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: updateErr.message || "Failed to update item" }, { status: 500 });
     }
 
-    return NextResponse.json({ item: updated });
+    let payoutResult = null;
+    let warning = null;
+
+    // When the vendor marks delivered, attempt to release payout immediately.
+    // attemptPayoutRelease will no-op if the buyer hasn't confirmed yet.
+    if (newStatus === "delivered" || isPayoutRetry) {
+      payoutResult = await attemptPayoutRelease(orderId);
+      if (payoutResult.released) {
+        // Re-fetch the updated item so the caller sees the new payout_status
+        const { data: refreshed } = await admin
+          .from("order_items")
+          .select("id, fulfillment_status, payout_status, payout_amount, payout_released_at, stripe_transfer_id")
+          .eq("id", itemId)
+          .single();
+        if (refreshed) Object.assign(updated, refreshed);
+      } else if (payoutResult.reason === "Awaiting buyer confirmation") {
+        warning = "Marked as delivered. Payout will be released automatically once the buyer confirms receipt.";
+      }
+      if (payoutResult.warnings?.length) {
+        console.warn("[items/route] Payout warnings:", payoutResult.warnings);
+      }
+    }
+
+    return NextResponse.json({ item: updated, payoutResult, ...(warning ? { warning } : {}) });
   } catch (err) {
     console.error("PATCH /api/orders/[id]/items/[itemId] error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
