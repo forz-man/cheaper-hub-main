@@ -12,6 +12,8 @@ const PUBLIC_ROUTES = new Set([
   "/auth/callback",
   "/api/auth/callback",
   "/contact",
+  "/api/products",
+  "/api/reviews",
 ]);
 
 const ADMIN_ROUTES = [
@@ -68,13 +70,9 @@ export async function proxy(request) {
   console.log("[middleware] User:", user?.email || "none");
 
   if (!user) {
-    if (isAdminRoute(pathname)) {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json({ message: "Authentication required" }, { status: 401 });
-      }
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
+    // API routes always get a JSON error, never an HTML redirect
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ message: "Authentication required" }, { status: 401 });
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
