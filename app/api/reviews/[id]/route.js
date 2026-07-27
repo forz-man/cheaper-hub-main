@@ -19,14 +19,14 @@ export async function PATCH(request, { params }) {
 
     const { data: existing } = await admin
       .from("reviews")
-      .select("id, user_id")
+      .select("id, buyer_id")
       .eq("id", id)
       .single();
 
     if (!existing) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
-    if (existing.user_id !== user.id) {
+    if (existing.buyer_id !== user.id) {
       return NextResponse.json({ error: "You can only edit your own reviews" }, { status: 403 });
     }
 
@@ -38,12 +38,12 @@ export async function PATCH(request, { params }) {
       }
       updates.rating = r;
     }
-    if (body.text !== undefined) {
-      const t = typeof body.text === "string" ? body.text.trim() : "";
-      if (t.length > 2000) {
-        return NextResponse.json({ error: "Review text must be under 2000 characters" }, { status: 400 });
+    if (body.comment !== undefined) {
+      const c = typeof body.comment === "string" ? body.comment.trim() : "";
+      if (c.length > 2000) {
+        return NextResponse.json({ error: "Review comment must be under 2000 characters" }, { status: 400 });
       }
-      updates.text = t || null;
+      updates.comment = c || null;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -54,7 +54,7 @@ export async function PATCH(request, { params }) {
       .from("reviews")
       .update(updates)
       .eq("id", id)
-      .select("id, rating, text, created_at")
+      .select("id, rating, comment, created_at")
       .single();
 
     if (error) {
@@ -83,14 +83,14 @@ export async function DELETE(request, { params }) {
 
     const { data: existing } = await admin
       .from("reviews")
-      .select("id, user_id")
+      .select("id, buyer_id")
       .eq("id", id)
       .single();
 
     if (!existing) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
-    if (existing.user_id !== user.id) {
+    if (existing.buyer_id !== user.id) {
       return NextResponse.json({ error: "You can only delete your own reviews" }, { status: 403 });
     }
 

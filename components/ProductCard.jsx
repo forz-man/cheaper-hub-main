@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Package, Star, Heart, Eye, ShoppingBag, TrendingUp, Sparkles, Zap, ArrowRight, Loader2 } from "lucide-react";
+import { Package, Heart, Eye, ShoppingBag, TrendingUp, Sparkles, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useCart } from "@/lib/cart-context";
+import StarRating from "@/components/reviews/StarRating";
 
 const ProductCard = ({ product }) => {
   const { addItem, openCart } = useCart();
@@ -36,8 +37,6 @@ const ProductCard = ({ product }) => {
   const discount = calculateDiscount(product.price, product.original_price);
   const rating = dbRating ?? product.rating ?? 0;
   const reviews = dbReviewCount ?? product.reviews ?? 0;
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 >= 0.5;
 
   const handleWishlist = (e) => {
     e.preventDefault();
@@ -163,21 +162,7 @@ const ProductCard = ({ product }) => {
         </Link>
         
         <div className="flex items-center gap-1.5 mb-3">
-          <div className="flex items-center gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <Star 
-                key={i}
-                size={14} 
-                className={`${
-                  i < fullStars 
-                    ? 'text-yellow-400 fill-yellow-400' 
-                    : i === fullStars && hasHalfStar
-                      ? 'text-yellow-400 fill-yellow-400 opacity-50'
-                      : 'text-gray-300'
-                }`} 
-              />
-            ))}
-          </div>
+          <StarRating value={rating} size={14} />
           <span className="text-xs font-bold text-black">{rating}</span>
           <span className="text-gray-300 text-xs">({reviews})</span>
         </div>

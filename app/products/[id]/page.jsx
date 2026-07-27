@@ -13,6 +13,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import useAuth from "@/hooks/useAuth";
+import StarRating from "@/components/reviews/StarRating";
+import ReviewCard from "@/components/reviews/ReviewCard";
 
 const MOCK_PRODUCTS = {
   "1": {
@@ -107,6 +109,7 @@ export default function ProductPage({ params }) {
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [canReview, setCanReview] = useState(false);
   const [existingReview, setExistingReview] = useState(null);
+  const [reviewOrderId, setReviewOrderId] = useState(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [reviewFormRating, setReviewFormRating] = useState(0);
   const [reviewFormText, setReviewFormText] = useState("");
@@ -216,9 +219,10 @@ export default function ProductPage({ params }) {
       const data = await res.json();
       setCanReview(data.canReview || false);
       setExistingReview(data.existingReview || null);
+      setReviewOrderId(data.orderId || null);
       if (data.existingReview) {
         setReviewFormRating(data.existingReview.rating);
-        setReviewFormText(data.existingReview.text || "");
+        setReviewFormText(data.existingReview.comment || "");
       }
     } catch {
       // silently fail
@@ -242,7 +246,7 @@ export default function ProductPage({ params }) {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: id, rating: reviewFormRating, text: reviewFormText.trim() }),
+        body: JSON.stringify({ orderId: reviewOrderId, productId: id, rating: reviewFormRating, comment: reviewFormText.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -473,16 +477,12 @@ export default function ProductPage({ params }) {
                     ) : (
                       <>
                         {reviewStats.total > 0 && (
-                          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#f0ede8]">
-                            <div className="text-center">
-                              <div className="text-4xl font-bold text-[#111]" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{reviewStats.average}</div>
-                              <div className="flex items-center gap-0.5 justify-center mt-1">
-                                {[1,2,3,4,5].map(s => (
-                                  <Star key={s} size={12} className={s <= Math.round(reviewStats.average) ? "text-amber-500 fill-amber-500" : "text-[#ddd]"} />
-                                ))}
+                            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#f0ede8]">
+                              <div className="text-center">
+                                <div className="text-4xl font-bold text-[#111]" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{reviewStats.average}</div>
+                                <StarRating value={reviewStats.average} size={12} className="justify-center mt-1" />
+                                <div className="text-xs text-[#aaa] mt-1">{reviewStats.total} reviews</div>
                               </div>
-                              <div className="text-xs text-[#aaa] mt-1">{reviewStats.total} reviews</div>
-                            </div>
                             <div className="flex-1 space-y-1.5">
                               {[5,4,3,2,1].map(s => {
                                 const count = reviewStats.distribution[s] || 0;
@@ -512,26 +512,7 @@ export default function ProductPage({ params }) {
                             <h4 className="text-sm font-semibold text-[#111] mb-3 flex items-center gap-2">
                               <Edit3 size={14} /> Write a review
                             </h4>
-                            <div className="flex items-center gap-1 mb-3">
-                              {[1,2,3,4,5].map(s => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  onClick={() => setReviewFormRating(s)}
-                                  className="p-0.5 transition-transform hover:scale-110"
-                                >
-                                  <Star
-                                    size={18}
-                                    className={s <= reviewFormRating ? "text-amber-500 fill-amber-500" : "text-[#ddd]"}
-                                  />
-                                </button>
-                              ))}
-                              {reviewFormRating > 0 && (
-                                <span className="text-xs text-[#888] ml-2">
-                                  {reviewFormRating === 1 ? "Poor" : reviewFormRating === 2 ? "Fair" : reviewFormRating === 3 ? "Good" : reviewFormRating === 4 ? "Very Good" : "Excellent"}
-                                </span>
-                              )}
-                            </div>
+                            <StarRating value={reviewFormRating} onChange={setReviewFormRating} size={18} showLabel interactive className="mb-3" />
                             <textarea
                               value={reviewFormText}
                               onChange={(e) => setReviewFormText(e.target.value)}
@@ -580,40 +561,13 @@ export default function ProductPage({ params }) {
                         {/* Review List */}
                         {reviews.length > 0 && (
                           <div className="space-y-5">
-                            {reviews.map((r) => {
-                              const dateStr = r.date ? new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
-                              const isOwnReview = user && r.user_id === user.id;
-                              return (
-                                <div key={r.id} className="pb-5 border-b border-[#f0ede8] last:border-0 last:pb-0">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-[#111]">{r.author}</span>
-                                        {r.verified && (
-                                          <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">
-                                            Verified
-                                          </span>
-                                        )}
-                                        {isOwnReview && (
-                                          <span className="text-[9px] font-semibold text-[#4648d4] bg-[#eef0ff] border border-[#d0d2f5] px-1.5 py-0.5 rounded-full">
-                                            You
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-1 mt-1">
-                                        {[1,2,3,4,5].map(s => (
-                                          <Star key={s} size={10} className={s <= r.rating ? "text-amber-500 fill-amber-500" : "text-[#ddd]"} />
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <span className="text-xs text-[#bbb]">{dateStr}</span>
-                                  </div>
-                                  {r.text && (
-                                    <p className="text-sm text-[#555] leading-relaxed">{r.text}</p>
-                                  )}
-                                </div>
-                              );
-                            })}
+                            {reviews.map((r) => (
+                              <ReviewCard
+                                key={r.id}
+                                review={r}
+                                isOwn={user && r.buyer_id === user.id}
+                              />
+                            ))}
                           </div>
                         )}
                       </>
@@ -643,11 +597,7 @@ export default function ProductPage({ params }) {
 
               {reviewStats.total > 0 && (
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="flex items-center gap-0.5">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} size={13} className={s <= Math.round(reviewStats.average) ? "text-amber-500 fill-amber-500" : "text-[#ddd]"} />
-                    ))}
-                  </div>
+                  <StarRating value={reviewStats.average} size={13} />
                   <span className="text-sm font-bold text-[#111]">{reviewStats.average}</span>
                   <span className="text-sm text-[#bbb]">({reviewStats.total} reviews)</span>
                 </div>

@@ -17,7 +17,7 @@ export async function GET(request) {
 
     const { data: reviews, error } = await admin
       .from("reviews")
-      .select("id, user_id, rating, text, created_at")
+      .select("id, buyer_id, rating, comment, created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: false });
 
@@ -29,7 +29,7 @@ export async function GET(request) {
       return NextResponse.json({ reviews: [], stats: { average: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } } });
     }
 
-    const userIds = [...new Set(reviews.map((r) => r.user_id))];
+    const userIds = [...new Set(reviews.map((r) => r.buyer_id))];
 
     const { data: profiles } = await admin
       .from("profiles")
@@ -43,12 +43,12 @@ export async function GET(request) {
 
     const enriched = reviews.map((r) => ({
       id: r.id,
-      author: profileMap[r.user_id] || "Anonymous",
+      author: profileMap[r.buyer_id] || "Anonymous",
       rating: r.rating,
-      text: r.text,
+      comment: r.comment,
       date: r.created_at,
       verified: true,
-      user_id: r.user_id,
+      buyer_id: r.buyer_id,
     }));
 
     const total = reviews.length;
@@ -64,8 +64,9 @@ export async function GET(request) {
   }
 }
 
-// POST /api/reviews  { product_id, rating, text }
-// Creates a review after verifying the user has a delivered order_item for this product.
+// POST /api/reviews  { orderId, productId, rating, comment }
+// Creates a review after verifying the user has a delivered order_item
+// for this product in this order.
 export async function POST(request) {
   try {
     const supabase = await createClient();
@@ -74,10 +75,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "You must be signed in to leave a review." }, { status: 401 });
     }
 
-    const { product_id, rating, text } = await request.json();
+    const { orderId, productId, rating, comment } = await request.json();
 
-    if (!product_id) {
-      return NextResponse.json({ error: "product_id is required" }, { status: 400 });
+    if (!orderId || !productId) {
+      return NextResponse.json({ error: "orderId and productId are required" }, { status: 400 });
     }
 
     const r = Number(rating);
@@ -85,76 +86,77 @@ export async function POST(request) {
       return NextResponse.json({ error: "rating must be an integer between 1 and 5" }, { status: 400 });
     }
 
-    const textStr = typeof text === "string" ? text.trim() : "";
-    if (textStr.length > 2000) {
+    const commentStr = typeof comment === "string" ? comment.trim() : "";
+    if (commentStr.length > 2000) {
       return NextResponse.json({ error: "Review text must be under 2000 characters" }, { status: 400 });
     }
 
-    // Verify purchase: check for a delivered order_item for this product by this user.
     const admin = createAdminClient();
-    const { data: orderItems } = await admin
+
+    // Verify order belongs to user and is delivered
+    const { data: order, error: orderErr } = await admin
+      .from("orders")
+      .select("id, status")
+      .eq("id", orderId)
+      .eq("buyer_id", user.id)
+      .single();
+
+    if (orderErr || !order) {
+      return NextResponse.json({ error: "Order not found or does not belong to you" }, { status: 404 });
+    }
+
+    if (order.status !== "delivered") {
+      return NextResponse.json({ error: "You can only review delivered orders" }, { status: 403 });
+    }
+
+    // Verify product belongs to this order and is delivered
+    const { data: orderItem, error: itemErr } = await admin
       .from("order_items")
-      .select("id, order_id, fulfillment_status")
-      .eq("product_id", String(product_id));
+      .select("id, fulfillment_status, vendor_id")
+      .eq("order_id", orderId)
+      .eq("product_id", String(productId))
+      .maybeSingle();
 
-    let matchingItem = null;
-    if (orderItems) {
-      for (const item of orderItems) {
-        if (item.fulfillment_status !== "delivered") continue;
-
-        const { data: order } = await admin
-          .from("orders")
-          .select("id")
-          .eq("id", item.order_id)
-          .eq("buyer_id", user.id)
-          .single();
-
-        if (order) {
-          matchingItem = item;
-          break;
-        }
-      }
+    if (itemErr || !orderItem) {
+      return NextResponse.json({ error: "Product not found in this order" }, { status: 404 });
     }
 
-    if (!matchingItem) {
-      return NextResponse.json(
-        { error: "You can only review products you have purchased and received." },
-        { status: 403 }
-      );
-    }
-
-    // Check for existing review (one review per product per user)
+    // Check for existing review for this order + product
     const { data: existing } = await admin
       .from("reviews")
       .select("id")
-      .eq("user_id", user.id)
-      .eq("product_id", product_id)
+      .eq("buyer_id", user.id)
+      .eq("product_id", productId)
+      .eq("order_id", orderId)
       .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
-        { error: "You have already reviewed this product." },
+        { error: "You have already reviewed this product for this order." },
         { status: 409 }
       );
     }
 
+    const vendor_id = orderItem.vendor_id || null;
+
     const { data: review, error: insertErr } = await admin
       .from("reviews")
       .insert({
-        product_id,
-        user_id: user.id,
-        order_item_id: matchingItem.id,
+        order_id: orderId,
+        product_id: productId,
+        buyer_id: user.id,
+        vendor_id,
         rating: r,
-        text: textStr || null,
+        comment: commentStr || null,
       })
-      .select("id, rating, text, created_at")
+      .select("id, rating, comment, created_at")
       .single();
 
     if (insertErr) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
-    return NextResponse.json({ review }, { status: 201 });
+    return NextResponse.json({ review, vendor_id }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }
