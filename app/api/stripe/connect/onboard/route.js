@@ -36,7 +36,8 @@ export async function POST(request) {
         type: "express",
         email: user.email,
         capabilities: {
-          transfers: { requested: true },
+          card_payments: { requested: true },
+          transfers:     { requested: true },
         },
       });
       accountId = account.id;
