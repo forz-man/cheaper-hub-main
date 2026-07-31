@@ -12,8 +12,7 @@ function isSuppressed(pathname) {
   return (
     pathname === "/checkout" ||
     pathname === "/order-success" ||
-    pathname.startsWith("/order-success/") ||
-    pathname.startsWith("/products/")   // detail pages have their own inline nav
+    pathname.startsWith("/order-success/")
   );
 }
 

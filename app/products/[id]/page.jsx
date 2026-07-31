@@ -4,11 +4,11 @@ import { useState, use, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Star, Heart, ShoppingBag, Package, Store,
-  Shield, Truck, RefreshCw, ChevronRight, Share2, Flag,
+  Star, Heart, ShoppingBag, Package,
+  Shield, Truck, RefreshCw, Share2,
   Check, Minus, Plus, ExternalLink, Loader2, ShoppingCart,
-  MessageCircle, Mail, Phone, MapPin, Clock, Award, User,
-  Edit3
+  MessageCircle, Mail, Phone, MapPin, Clock,
+  Edit3, ArrowLeft
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
@@ -274,6 +274,14 @@ export default function ProductPage({ params }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/products");
+    }
+  };
+
   if (dbLoading || authLoading) {
     return (
       <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
@@ -301,48 +309,14 @@ export default function ProductPage({ params }) {
   const pct = product.original_price ? Math.round((1 - product.price / product.original_price) * 100) : null;
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef]" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+    <div className="min-h-screen bg-[#f5f3ef] pt-14 sm:pt-16 md:pt-[72px]" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
 
-      {/* Nav */}
-      <nav className="bg-white border-b border-[#e2ddd6] sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[#888] hover:text-[#111] transition-colors">
-              <ArrowLeft size={16} /> Back
-            </button>
-            <span className="text-[#ddd]">|</span>
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#aaa]">
-              <Link href="/" className="hover:text-[#111]">Marketplace</Link>
-              <ChevronRight size={12} />
-              <span className="text-[#888]">{product.category}</span>
-              <ChevronRight size={12} />
-              <span className="text-[#111] font-medium truncate max-w-[160px]">{product.name}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={openCart}
-              className="relative p-2 rounded-full hover:bg-[#f5f3ef] transition-colors"
-              aria-label="Open cart"
-            >
-              <ShoppingCart size={18} className="text-[#555]" />
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#111] text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                  {cartCount > 9 ? "9+" : cartCount}
-                </span>
-              )}
-            </button>
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-md bg-[#111] flex items-center justify-center">
-                <span className="text-white font-bold text-xs" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-              </div>
-              <span className="font-bold text-sm hidden sm:block" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <div className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
 
-      <div className="max-w-6xl mx-auto px-5 md:px-8 py-8">
+        <button onClick={handleBack} className="flex items-center gap-1.5 text-sm text-[#888] hover:text-[#111] transition-colors mb-4">
+          <ArrowLeft size={16} /> Back
+        </button>
+
         <div className="grid lg:grid-cols-[1fr_380px] gap-8">
 
           {/* ── Left: Images + Tabs ── */}
