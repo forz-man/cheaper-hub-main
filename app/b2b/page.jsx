@@ -165,26 +165,7 @@ export default function B2BPage() {
 
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="bg-[#e0e3e5] border-t border-[#c6c6cd]">
-        <div className="max-w-[1280px] mx-auto px-10 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-[#4648d4] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <span className="font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
-          </Link>
-          <div className="flex gap-6 text-sm text-[#45464d]">
-            <a href="#" className="hover:text-black">Privacy</a>
-            <a href="#" className="hover:text-black">Terms</a>
-            <Link href="/b2c" className="hover:text-black">For Individuals</Link>
-          </div>
-          <div className="flex gap-3">
-            <a className="text-[#45464d] hover:text-[#4648d4]" href="#"><Share2 size={18} /></a>
-            <a className="text-[#45464d] hover:text-[#4648d4]" href="#"><Globe size={18} /></a>
-          </div>
-        </div>
-      </footer>
+
 
     </div>
   );

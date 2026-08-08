@@ -1,7 +1,10 @@
 "use client";
 
+// Active Next.js Links
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import useAuth from '@/hooks/useAuth';
 import { 
   FaFacebook, FaTwitter, FaInstagram, FaYoutube, 
   FaLinkedin, FaGithub 
@@ -14,6 +17,9 @@ import { BsSignNoParkingFill } from 'react-icons/bs';
 
 
 const Footer = () => {
+  const { user } = useAuth();
+  const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -27,29 +33,38 @@ const Footer = () => {
     }
   };
 
+  const handleSellerDashboardClick = (e) => {
+    e.preventDefault();
+    if (user) {
+      router.push("/vendor/profile");
+    } else {
+      router.push("/login?redirect=/vendor/profile");
+    }
+  };
+
   const footerLinks = {
     "Marketplace": [
-      { label: "Browse Products", href: "/products" },
+      { label: "Browse Products", href: "/marketplace" },
       { label: "Top Deals", href: "/deals" },
-      { label: "New Arrivals", href: "/new" },
-      { label: "Verified Sellers", href: "/sellers" },
+      { label: "New Arrivals", href: "/marketplace?sort=newest" },
+      // { label: "Verified Sellers", href: "#" },
     ],
     "For Sellers": [
-      { label: "Start Selling", href: "/sell" },
-      { label: "Seller Dashboard", href: "/dashboard" },
-      { label: "Pricing Plans", href: "/pricing" },
-      { label: "Success Stories", href: "/stories" },
+      { label: "Start Selling", href: "/select-role" },
+      { label: "Seller Dashboard", href: "#" },
+      // { label: "Pricing Plans", href: "#" },
     ],
     "Support": [
-      { label: "Help Center", href: "/help" },
+      { label: "Help Center", href: "/contact" },
       { label: "Contact Us", href: "/contact" },
       { label: "FAQ", href: "/faq" },
-      { label: "Returns Policy", href: "/returns" },
+      { label: "Returns Policy", href: "/contact" },
     ],
     "Company": [
       { label: "Sustainability", href: "/sustainability" },
       { label: "Careers", href: "/careers" },
-      { label: "Press Kit", href: "/press" },
+      // { label: "Success Stories", href: "#" },
+      // { label: "Press Kit", href: "#" },
     ],
   };
 
@@ -65,7 +80,7 @@ const Footer = () => {
   return (
     <footer className="bg-white text-[#0a0a0a] relative overflow-hidden border-t border-gray-200">
       
-      <div className="absolute inset-0 opacity-5">
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute top-0 left-0 w-64 h-64 bg-black rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-gray-700 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
@@ -135,16 +150,30 @@ const Footer = () => {
                 {title}
               </h3>
               <ul className="space-y-2">
-                {links.map(({ label, href }) => (
-                  <li key={label}>
-                    <Link 
-                      href={href} 
-                      className="text-gray-500 text-sm hover:text-gray-800 transition-all duration-300 hover:translate-x-1 inline-block"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
+                {links.map(({ label, href }) => {
+                  if (label === "Seller Dashboard") {
+                    return (
+                      <li key={label}>
+                        <button
+                          onClick={handleSellerDashboardClick}
+                          className="text-gray-500 text-sm hover:text-gray-800 transition-all duration-300 hover:translate-x-1 inline-block text-left bg-transparent border-none p-0 cursor-pointer"
+                        >
+                          {label}
+                        </button>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={label}>
+                      <Link 
+                        href={href} 
+                        className="text-gray-500 text-sm hover:text-gray-800 transition-all duration-300 hover:translate-x-1 inline-block"
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
