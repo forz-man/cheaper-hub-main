@@ -46,3 +46,11 @@ next-env.d.ts
 #replit command
 .replit
 
+
+# Local Netlify folder
+.netlify
+
+# Playwright test folders
+test-results/
+playwright-report/
+blob-report/

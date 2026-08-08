@@ -18,6 +18,9 @@ function SelectRoleContent() {
   const handleSelect = async (role) => {
     if (loading) return;
 
+    // Map roles: vendor -> seller, buyer -> buyer
+    const urlRole = role === "vendor" ? "seller" : (role === "buyer" ? "buyer" : role);
+
     if (fromOAuth) {
       setLoading(role);
       setError("");
@@ -40,7 +43,7 @@ function SelectRoleContent() {
         setLoading(null);
       }
     } else {
-      router.push(`/register?role=${role}`);
+      router.push(`/register?role=${urlRole}`);
     }
   };
 
@@ -58,7 +61,7 @@ function SelectRoleContent() {
             type="button"
             onClick={() => handleSelect("buyer")}
             disabled={!!loading}
-            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#4648d4] hover:shadow-lg hover:shadow-[#4648d4]/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group"
+            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#4648d4] hover:shadow-lg hover:shadow-[#4648d4]/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
           >
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#4648d4]/10 flex items-center justify-center text-2xl flex-shrink-0">
@@ -91,7 +94,7 @@ function SelectRoleContent() {
             type="button"
             onClick={() => handleSelect("vendor")}
             disabled={!!loading}
-            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#131b2e] hover:shadow-lg hover:shadow-black/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group"
+            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#131b2e] hover:shadow-lg hover:shadow-black/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
           >
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#131b2e]/10 flex items-center justify-center text-2xl flex-shrink-0">

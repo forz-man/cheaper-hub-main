@@ -40,7 +40,7 @@ function CallbackHandler() {
       const errorDescription = searchParams.get("error_description");
 
       if (error) {
-        console.error("OAuth error:", error, errorDescription);
+        console.warn("OAuth error:", error, errorDescription);
         router.replace("/login?error=" + encodeURIComponent(errorDescription || error));
         return;
       }
@@ -48,7 +48,7 @@ function CallbackHandler() {
       if (code) {
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) {
-          console.error("Code exchange failed:", exchangeError.message);
+          console.warn("Code exchange failed:", exchangeError.message);
           router.replace("/login?error=" + encodeURIComponent(exchangeError.message));
           return;
         }

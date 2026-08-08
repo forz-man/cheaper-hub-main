@@ -12,9 +12,12 @@ export function CartProvider({ children }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem("cheaper_cart");
-      if (stored) setItems(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setTimeout(() => setItems(parsed), 0);
+      }
     } catch {}
-    setHydrated(true);
+    setTimeout(() => setHydrated(true), 0);
   }, []);
 
   useEffect(() => {

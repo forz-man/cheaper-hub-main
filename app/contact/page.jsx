@@ -106,7 +106,7 @@ export default function ContactPage() {
             </div>
 
             <div className="bg-black rounded-2xl p-5 mt-2">
-              <p className="text-sm font-semibold text-white mb-1.5">What's this about?</p>
+              <p className="text-sm font-semibold text-white mb-1.5">What&apos;s this about?</p>
               <div className="flex flex-wrap gap-2">
                 {TOPICS.map((t) => (
                   <button
@@ -144,7 +144,7 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-bold text-black mb-2">Message sent</h3>
                 <p className="text-sm text-gray-400 max-w-sm mb-6">
-                  Thanks for reaching out — we'll get back to you by email soon.
+                  Thanks for reaching out — we&apos;ll get back to you by email soon.
                 </p>
                 <button
                   onClick={() => setStatus("idle")}

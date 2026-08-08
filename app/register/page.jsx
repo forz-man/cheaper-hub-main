@@ -7,12 +7,12 @@ import AuthShell from "@/components/auth/AuthShell";
 import AuthCard from "@/components/auth/AuthCard";
 import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import PasswordStrength from "@/components/auth/PasswordStrength";
-import { register } from "@/lib/auth";
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get("role");
+  const rawRole = searchParams.get("role");
+  const role = (rawRole === "seller" || rawRole === "vendor") ? "vendor" : (rawRole === "buyer" ? "buyer" : null);
 
   // No role chosen yet (e.g. someone landed on /register directly) —
   // send them to pick one instead of silently defaulting to "buyer".
@@ -34,26 +34,62 @@ function RegisterForm() {
   if (!role) return null;
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    console.log("Submit button clicked! Sending payload to /api/auth/register...");
+    e?.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (!agreed) {
-      setError("You must agree to the Terms and Privacy Policy.");
-      return;
-    }
+    try {
+      const trimmedEmail = email.trim();
+      const trimmedFullName = fullName.trim();
 
-    setLoading(true);
-    const { error } = await register({ email, password, fullName, role });
+      if (!trimmedEmail || !password || !confirmPassword || !trimmedFullName || !agreed) {
+        setError("Please fill all fields and accept the terms.");
+        return;
+      }
 
-    if (error) {
-      setError(error.message);
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+
+      setLoading(true);
+
+      const username = trimmedEmail.split("@")[0] || "";
+      const cleanUsername = username.replace(/^@/, '').trim();
+
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, password, fullName: trimmedFullName, username: cleanUsername, role }),
+      });
+      const result = await res.json();
+
+      if (!result.success) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      const data = result.data;
+      if (data?.user) {
+        console.log("[Registration] SignUp success via API. User record ID:", data.user.id);
+        try {
+          localStorage.setItem(`ch_reg_id_${trimmedEmail.toLowerCase()}`, data.user.id);
+          localStorage.setItem(`ch_reg_role_${trimmedEmail.toLowerCase()}`, role);
+          localStorage.setItem(`ch_reg_name_${trimmedEmail.toLowerCase()}`, trimmedFullName);
+        } catch (storageErr) {
+          console.warn("Failed to store registered user metadata locally:", storageErr);
+        }
+        router.push(`/verify-email?email=${encodeURIComponent(trimmedEmail)}`);
+      } else {
+        console.warn("[Registration] SignUp response contains no user data");
+        setError("Sign-up succeeded, but no user record was returned by the database.");
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Registration submit error:", err);
+      setError("Server connection error. Please try again.");
       setLoading(false);
-    } else {
-      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     }
   };
 
@@ -132,7 +168,7 @@ function RegisterForm() {
               className="mt-0.5 h-4 w-4 rounded accent-[#111]"
             />
             <span>
-              I agree to Cheaper's{" "}
+              I agree to Cheaper&apos;s{" "}
               <Link href="#" className="font-semibold text-[#111] hover:underline">Terms</Link>{" "}
               and{" "}
               <Link href="#" className="font-semibold text-[#111] hover:underline">Privacy Policy</Link>.
@@ -141,10 +177,11 @@ function RegisterForm() {
 
           <button
             type="submit"
+            onClick={handleSubmit}
             disabled={loading}
             className="h-11 w-full rounded-lg bg-[#111] font-semibold text-white text-sm hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? "Creating account…" : `Create ${roleLabel} Account`}
+            {loading ? "Creating Account..." : role === "vendor" ? "Create Seller Account" : "Create Buyer Account"}
           </button>
         </form>
 

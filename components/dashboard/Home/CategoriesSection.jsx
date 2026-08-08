@@ -43,7 +43,7 @@ const CategoriesSection = () => {
         <div className="flex justify-between items-end mb-8">
           <div>
             <h2 className="text-2xl font-bold text-black">Shop by Category</h2>
-            <p className="text-sm text-gray-400 mt-1">Find what you're looking for</p>
+            <p className="text-sm text-gray-400 mt-1">Find what you&apos;re looking for</p>
           </div>
         </div>
         

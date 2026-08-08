@@ -254,6 +254,11 @@ export default function BuyerDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace("/login"); return; }
 
+      if (!user.email_confirmed_at) {
+        router.replace(`/verify-email?email=${encodeURIComponent(user.email || "")}`);
+        return;
+      }
+
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       const role = resolveUserRole(user, profile?.role);
       if (role !== "buyer") { router.replace("/dashboard"); return; }

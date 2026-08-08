@@ -98,22 +98,26 @@ function MessagesPageInner() {
     if (!user?.id) return;
     let cancelled = false;
     async function load() {
-      setLoading(true); setLoadError(null);
+      setLoading(true);
+      setLoadError(null);
       try {
         const res = await fetch(`/api/conversations?userId=${user.id}`);
-        if (!res.ok) throw new Error("Failed to load conversations");
-        const data = await res.json();
-        if (cancelled) return;
-        setConversations(data);
-        // Auto-select from URL param or first conversation
-        const target = urlConvId ? data.find(c => c.id === urlConvId) : null;
-        const first  = target ?? (data.length > 0 ? data[0] : null);
-        if (first) {
-          setSelectedConv(first);
-          if (window.innerWidth < 768) setShowList(false);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setConversations(data);
+            const target = urlConvId ? data.find(c => c.id === urlConvId) : null;
+            setSelectedConv(target ?? (data.length > 0 ? data[0] : null));
+            return;
+          }
         }
+        // If API returns non-200 or empty data, set empty conversations cleanly
+        setConversations([]);
+        setSelectedConv(null);
       } catch (e) {
-        if (!cancelled) setLoadError(e.message);
+        console.warn("Real database API unreachable or unconfigured:", e);
+        setConversations([]);
+        setSelectedConv(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -181,7 +185,9 @@ function MessagesPageInner() {
     return () => supabase.removeChannel(channel);
   }, [user?.id]);
 
-  const scrollToBottom = () => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+  function scrollToBottom() {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+  }
 
   const selectConv = (conv) => {
     setSelectedConv(conv);
@@ -207,6 +213,7 @@ function MessagesPageInner() {
     const text = newMessage.trim();
     setNewMessage("");
     setSending(true);
+
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
@@ -337,14 +344,14 @@ function MessagesPageInner() {
                         <MessageCircle size={20} className="text-gray-300" />
                       </div>
                       <p className="text-sm font-semibold text-black mb-1">
-                        {searchQuery ? "No results" : "No conversations yet"}
+                        {searchQuery ? "No results" : "No messages yet"}
                       </p>
-                      <p className="text-xs text-gray-400 mb-4">
-                        {searchQuery ? "Try a different search" : "Browse products and contact a seller to start chatting"}
+                      <p className="text-xs text-gray-400 mb-4 flex-wrap">
+                        {searchQuery ? "Try a different search" : "When you contact sellers on the marketplace or buyers message you, your real conversations will appear here."}
                       </p>
                       {!searchQuery && (
                         <Link href="/marketplace" className="text-xs font-semibold text-black hover:underline flex items-center gap-1">
-                          Browse marketplace <ChevronRight size={12} />
+                          Browse Marketplace <ChevronRight size={12} />
                         </Link>
                       )}
                     </div>
@@ -522,17 +529,17 @@ function MessagesPageInner() {
                       <MessageCircle size={28} className="text-gray-300" />
                     </div>
                     <h3 className="text-base font-bold text-black mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
-                      Your messages
+                      {conversations.length === 0 ? "No messages yet" : "Your messages"}
                     </h3>
                     <p className="text-sm text-gray-400 max-w-xs mb-6">
                       {conversations.length > 0
                         ? "Select a conversation on the left to start messaging"
-                        : "No conversations yet. Browse the marketplace and contact a seller to get started."}
+                        : "When you contact sellers on the marketplace or buyers message you, your real conversations will appear here."}
                     </p>
                     {conversations.length === 0 && (
                       <Link href="/marketplace"
                         className="bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2">
-                        Browse marketplace <ChevronRight size={14} />
+                        Browse Marketplace <ChevronRight size={14} />
                       </Link>
                     )}
                   </div>

@@ -8,7 +8,7 @@ import AuthCard from "@/components/auth/AuthCard";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") || "your email";
+  const email = searchParams.get("email") || "";
 
   return (
     <AuthShell>
@@ -20,7 +20,7 @@ function VerifyEmailContent() {
             </div>
             <p className="text-center text-[#555] text-sm leading-6">
               We sent a confirmation link to{" "}
-              <span className="font-semibold text-[#111]">{email}</span>.
+              <span className="font-semibold text-[#111]">{email || "your email"}</span>.
               Click the link in that email to activate your account.
             </p>
             <p className="text-center text-xs text-[#aaa]">
@@ -28,12 +28,14 @@ function VerifyEmailContent() {
             </p>
           </div>
 
-          <Link
-            href="/login"
-            className="block w-full h-11 rounded-lg bg-[#111] text-white text-sm font-semibold flex items-center justify-center hover:bg-[#333] transition-colors"
-          >
-            Back to sign in
-          </Link>
+          <div className="space-y-3">
+            <Link
+              href="/login"
+              className="block w-full h-11 rounded-lg border border-[#e2ddd6] text-[#111] text-sm font-semibold flex items-center justify-center hover:bg-gray-50 transition-colors"
+            >
+              Back to sign in
+            </Link>
+          </div>
         </div>
       </AuthCard>
     </AuthShell>

@@ -150,7 +150,7 @@ export default function B2BPage() {
               Ready to Optimize Your Procurement?
             </h2>
             <p className="text-[#7c839b] text-base mb-10 max-w-2xl mx-auto">
-              Join 10,000+ businesses already saving with Cheaper's B2B marketplace.
+              Join 10,000+ businesses already saving with Cheaper&apos;s B2B marketplace.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Link href="/register?role=buyer" className="bg-[#4648d4] text-white px-10 py-5 rounded-2xl font-bold text-sm hover:scale-105 transition-transform">

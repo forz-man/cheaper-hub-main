@@ -291,7 +291,7 @@ export default function SustainabilityPage() {
               <span className="text-violet-600">Evercove</span>
             </h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Evercove is a specialist ESG advisory firm. We've embedded their team into
+              Evercove is a specialist ESG advisory firm. We&apos;ve embedded their team into
               our operations — not to tick a box, but to make sure every sustainability
               claim we make is independently measured, verified, and published.
             </p>
@@ -403,8 +403,8 @@ export default function SustainabilityPage() {
                 Our mission: make the green<br className="hidden sm:block" /> choice the cheap choice
               </h2>
               <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xl mx-auto">
-                Re-sale, circular supply chains, and emission-conscious logistics aren't
-                just ethical — they are structurally cheaper. We're building the
+                Re-sale, circular supply chains, and emission-conscious logistics aren&apos;t
+                just ethical — they are structurally cheaper. We&apos;re building the
                 marketplace that proves it, one sustainable purchase at a time.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">

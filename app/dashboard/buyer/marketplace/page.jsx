@@ -234,7 +234,7 @@ export default function MarketplacePage() {
             {productsLoading ? "Loading…" : (
               <>
                 <span className="font-semibold text-[#111]">{products.length}</span> {products.length === 1 ? "product" : "products"}
-                {search && <> matching <span className="font-semibold text-[#111]">"{search}"</span></>}
+                {search && <> matching <span className="font-semibold text-[#111]">&quot;{search}&quot;</span></>}
                 {category && <> in <span className="font-semibold text-[#111]">{category}</span></>}
               </>
             )}
@@ -274,8 +274,8 @@ export default function MarketplacePage() {
               return (
                 <div key={product.id} className="bg-white border border-[#e2ddd6] rounded-xl overflow-hidden hover:border-[#999] hover:shadow-md transition-all flex flex-col">
                   <div className="h-36 bg-[#f9f8f6] relative flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {product.images?.[0] ? (
-                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain p-3" />
+                    {(product.image || product.image_url || product.images?.[0]) ? (
+                      <img src={product.image || product.image_url || product.images?.[0] || '/products/rog-laptop.png'} alt={product.name} className="w-full h-full object-contain p-3" />
                     ) : (
                       <Package size={30} className="text-[#ddd]" />
                     )}

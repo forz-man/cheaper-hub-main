@@ -182,6 +182,15 @@ alter table public.profiles add column if not exists stripe_charges_enabled bool
 alter table public.profiles add column if not exists stripe_payouts_enabled boolean default false;
 alter table public.profiles add column if not exists stripe_details_submitted boolean default false;
 
+-- Safe to re-run: add missing vendor profile fields to pre-existing profiles tables.
+alter table public.profiles add column if not exists store_name text;
+alter table public.profiles add column if not exists phone_number text;
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists website text;
+alter table public.profiles add column if not exists location text;
+alter table public.profiles add column if not exists bio text;
+alter table public.profiles add column if not exists avatar_url text;
+
 alter table public.profiles enable row level security;
 
 create policy "profiles_public_read" on public.profiles

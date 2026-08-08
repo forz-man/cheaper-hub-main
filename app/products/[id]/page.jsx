@@ -98,6 +98,45 @@ export default function ProductPage({ params }) {
 
   const { addItem, openCart, count: cartCount } = useCart();
   const [wishlisted, setWishlisted] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    async function checkWishlist() {
+      const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+      const storageKey = user ? `cheaper_wishlist_ids_${user.id}` : "cheaper_wishlist_ids";
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const ids = JSON.parse(stored);
+          setWishlisted(ids.includes(String(id)));
+        }
+      } catch {}
+    }
+    checkWishlist();
+  }, [id]);
+
+  const handleToggleWishlist = async () => {
+    const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+    const storageKey = user ? `cheaper_wishlist_ids_${user.id}` : "cheaper_wishlist_ids";
+    
+    let ids = [];
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) ids = JSON.parse(stored);
+    } catch {}
+
+    let nextWishlisted = !wishlisted;
+    if (nextWishlisted) {
+      if (!ids.includes(String(id))) ids.push(String(id));
+    } else {
+      ids = ids.filter(x => x !== String(id));
+    }
+    
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(ids));
+    } catch {}
+    setWishlisted(nextWishlisted);
+  };
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
@@ -344,7 +383,7 @@ export default function ProductPage({ params }) {
                   {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} className="text-[#888]" />}
                 </button>
                 <button
-                  onClick={() => setWishlisted(w => !w)}
+                  onClick={handleToggleWishlist}
                   className={`w-9 h-9 rounded-full bg-white border flex items-center justify-center transition-all shadow-sm ${
                     wishlisted ? "border-red-300 bg-red-50" : "border-[#e2ddd6] hover:border-[#999]"
                   }`}
@@ -646,7 +685,7 @@ export default function ProductPage({ params }) {
               </button>
 
               <button
-                onClick={() => setWishlisted(w => !w)}
+                onClick={handleToggleWishlist}
                 className={`w-full py-3.5 rounded-xl font-semibold text-sm border transition-all flex items-center justify-center gap-2 mt-2 ${
                   wishlisted
                     ? "bg-red-50 border-red-200 text-red-600"

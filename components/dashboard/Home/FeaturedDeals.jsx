@@ -11,7 +11,7 @@ const FeaturedDeals = ({ products, loading }) => {
       <div className="container">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-black">Today's Deals</h2>
+            <h2 className="text-2xl font-bold text-black">Today&apos;s Deals</h2>
             <p className="text-sm text-gray-400 mt-1">Curated daily by our team</p>
           </div>
           <a href="#" className="flex items-center gap-1 text-sm font-semibold text-black hover:text-gray-600 transition-colors">

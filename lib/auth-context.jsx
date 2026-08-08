@@ -38,48 +38,81 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase) { setLoading(false); return; }
+    if (!supabase) {
+      setTimeout(() => setLoading(false), 0);
+      return;
+    }
 
     async function initAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("[AuthProvider] getSession:", session?.user?.email || "no session");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("[AuthProvider] getSession:", session?.user?.email || "no session");
 
-      if (session?.user) {
-        const expired = checkAndUpdateIdle();
-        if (expired) {
-          console.log("[AuthProvider] Session expired (idle), signing out");
-          await supabase.auth.signOut();
+        if (session?.user) {
+          const expired = checkAndUpdateIdle();
+          if (expired) {
+            console.log("[AuthProvider] Session expired (idle), signing out");
+            try {
+              await supabase.auth.signOut();
+            } catch (err) {
+              console.warn("[AuthProvider] signOut failed:", err);
+            }
+            clearIdle();
+            setUser(null);
+          } else {
+            // Use getUser() (network request) over getSession() (cached JWT)
+            // so metadata changes (e.g. role update by admin) are reflected.
+            try {
+              const { data: { user: latestUser } } = await supabase.auth.getUser();
+              console.log("[AuthProvider] getUser:", latestUser?.email || "no user");
+              setUser(latestUser || session.user);
+            } catch (err) {
+              console.warn("[AuthProvider] getUser failed:", err);
+              setUser(session.user);
+            }
+          }
+        } else {
           clearIdle();
           setUser(null);
-        } else {
-          // Use getUser() (network request) over getSession() (cached JWT)
-          // so metadata changes (e.g. role update by admin) are reflected.
-          const { data: { user: latestUser } } = await supabase.auth.getUser();
-          console.log("[AuthProvider] getUser:", latestUser?.email || "no user");
-          setUser(latestUser || session.user);
         }
-      } else {
-        clearIdle();
+      } catch (error) {
+        console.warn("[AuthProvider] initAuth error:", error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[AuthProvider] onAuthStateChange:", event, session?.user?.email || "no session");
-      if (session?.user) {
-        checkAndUpdateIdle();
-        setUser(session.user);
-      } else {
-        clearIdle();
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    let subscription;
+    try {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log("[AuthProvider] onAuthStateChange:", event, session?.user?.email || "no session");
+        if (session?.user) {
+          checkAndUpdateIdle();
+          setUser(session.user);
+        } else {
+          clearIdle();
+          setUser(null);
+        }
+        setLoading(false);
+      });
+      subscription = data?.subscription;
+    } catch (error) {
+      console.warn("[AuthProvider] onAuthStateChange error:", error);
+      setTimeout(() => setLoading(false), 0);
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) {
+        try {
+          subscription.unsubscribe();
+        } catch (err) {
+          console.warn("[AuthProvider] unsubscribe error:", err);
+        }
+      }
+    };
   }, []);
 
   return (

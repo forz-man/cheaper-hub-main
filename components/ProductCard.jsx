@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useCart } from "@/lib/cart-context";
 import StarRating from "@/components/reviews/StarRating";
+import { supabase } from "@/lib/supabase";
 
 const ProductCard = ({ product }) => {
   const { addItem, openCart } = useCart();
@@ -26,6 +27,19 @@ const ProductCard = ({ product }) => {
         }
       })
       .catch(() => {});
+
+    async function checkWishlist() {
+      const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+      const storageKey = user ? `cheaper_wishlist_ids_${user.id}` : "cheaper_wishlist_ids";
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const ids = JSON.parse(stored);
+          setIsWishlisted(ids.includes(product.id));
+        }
+      } catch {}
+    }
+    checkWishlist();
   }, [product?.id]);
 
   const calculateDiscount = (price, originalPrice) => {
@@ -38,10 +52,30 @@ const ProductCard = ({ product }) => {
   const rating = dbRating ?? product.rating ?? 0;
   const reviews = dbReviewCount ?? product.reviews ?? 0;
 
-  const handleWishlist = (e) => {
+  const handleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    
+    const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+    const storageKey = user ? `cheaper_wishlist_ids_${user.id}` : "cheaper_wishlist_ids";
+    
+    let ids = [];
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) ids = JSON.parse(stored);
+    } catch {}
+
+    const nextWishlisted = !isWishlisted;
+    if (nextWishlisted) {
+      if (!ids.includes(product.id)) ids.push(product.id);
+    } else {
+      ids = ids.filter(id => id !== product.id);
+    }
+    
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(ids));
+    } catch {}
+    setIsWishlisted(nextWishlisted);
   };
 
   const handleAddToCart = (e) => {
@@ -61,9 +95,9 @@ const ProductCard = ({ product }) => {
       whileHover={{ y: -8, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}
     >
       <div className="relative h-52 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center overflow-hidden">
-        {product.images?.[0] ? (
+        {(product.image || product.image_url || product.images?.[0]) ? (
           <motion.img
-            src={product.images[0]}
+            src={product.image || product.image_url || product.images?.[0] || '/products/rog-laptop.png'}
             alt={product.name}
             className="w-full h-full object-contain p-4"
             animate={{ scale: isHovered ? 1.06 : 1 }}

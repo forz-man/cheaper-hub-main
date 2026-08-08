@@ -13,14 +13,15 @@ import { useCart } from "@/lib/cart-context";
 import ProductCard from "@/components/ProductCard";
 
 const MOCK_PRODUCTS = [
-  { id: "m1", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics" },
-  { id: "m2", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home" },
-  { id: "m3", name: "Running Shoes X2", vendor_name: "SportZone", price: 44.99, original_price: 89.99, rating: 4.7, reviews: 215, category: "Sports" },
-  { id: "m4", name: "Ceramic Mug Set (4)", vendor_name: "HomeGoods Co.", price: 12.50, original_price: 24.00, rating: 5.0, reviews: 87, category: "Home" },
-  { id: "m5", name: "Standing Desk Pro", vendor_name: "WorkSpace Co.", price: 249.99, original_price: 349.99, rating: 4.7, reviews: 203, category: "Electronics" },
-  { id: "m6", name: "Air Purifier HEPA", vendor_name: "CleanAir Shop", price: 89.00, original_price: 129.00, rating: 4.9, reviews: 87, category: "Home" },
-  { id: "m7", name: "Leather Wallet Slim", vendor_name: "Craft & Co.", price: 34.00, original_price: 54.00, rating: 4.6, reviews: 145, category: "Fashion" },
-  { id: "m8", name: "Smart Plug (4-pack)", vendor_name: "TechHub Store", price: 19.99, original_price: 29.99, rating: 4.8, reviews: 412, category: "Electronics" },
+  { id: "m1", name: "ASUS ROG Strix G16 Gaming Laptop", vendor_name: "TechHub Store", price: 1399.99, original_price: 1599.99, rating: 4.8, reviews: 156, category: "Electronics", image: "/products/rog-laptop.png", image_url: "/products/rog-laptop.png", images: ["/products/rog-laptop.png"] },
+  { id: "m2", name: "Apple iPhone 14", vendor_name: "TechHub Store", price: 699.99, original_price: 799.99, rating: 4.7, reviews: 284, category: "Electronics", image: "/products/iphone14.png", image_url: "/products/iphone14.png", images: ["/products/iphone14.png"] },
+  { id: "m3", name: "Sony WH-1000XM5", vendor_name: "TechHub Store", price: 349.99, original_price: 399.99, rating: 4.9, reviews: 412, category: "Electronics", image: "/products/sony-headphones.png", image_url: "/products/sony-headphones.png", images: ["/products/sony-headphones.png"] },
+  { id: "m4", name: "Samsung Galaxy S25 Ultra", vendor_name: "TechHub Store", price: 1199.99, original_price: 1299.99, rating: 4.9, reviews: 92, category: "Electronics", image: "/products/samsung-s25.png", image_url: "/products/samsung-s25.png", images: ["/products/samsung-s25.png"] },
+  { id: "m5", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics", image: "/products/airpods-pro.png", image_url: "/products/airpods-pro.png", images: ["/products/airpods-pro.png"] },
+  { id: "m6", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home", image: "/products/throw-blanket.png", image_url: "/products/throw-blanket.png", images: ["/products/throw-blanket.png"] },
+  { id: "m7", name: "Running Shoes X2", vendor_name: "SportZone", price: 44.99, original_price: 89.99, rating: 4.7, reviews: 215, category: "Sports", image: "/products/running-shoes.png", image_url: "/products/running-shoes.png", images: ["/products/running-shoes.png"] },
+  { id: "m8", name: "Ceramic Mug Set (4)", vendor_name: "HomeGoods Co.", price: 12.50, original_price: 24.00, rating: 5.0, reviews: 87, category: "Home", image: "/products/ceramic-mugs.png", image_url: "/products/ceramic-mugs.png", images: ["/products/ceramic-mugs.png"] },
+  { id: "m9", name: "Standing Desk Pro", vendor_name: "WorkSpace Co.", price: 249.99, original_price: 349.99, rating: 4.7, reviews: 203, category: "Electronics", image: "/products/standing-desk.png", image_url: "/products/standing-desk.png", images: ["/products/standing-desk.png"] }
 ];
 
 const CATEGORIES = [
@@ -63,6 +64,7 @@ function MarketplaceContent() {
   const [searchQuery, setSearchQuery]     = useState(() => searchParams.get("q") || "");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get("category") || "all");
+  const [selectedVendor, setSelectedVendor]     = useState("all");
   const [sortBy, setSortBy]               = useState("newest");
   const [priceRange, setPriceRange]       = useState([0, 1000]);
 
@@ -70,38 +72,54 @@ function MarketplaceContent() {
   // (e.g. navbar/hero search while already on this page).
   useEffect(() => {
     const q = searchParams.get("q") || "";
-    setSearchQuery((current) => (current === q ? current : q));
+    setTimeout(() => setSearchQuery((current) => (current === q ? current : q)), 0);
   }, [searchParams]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
 
-    let q = supabase
-      .from("products")
-      .select("id, name, vendor_name, price, original_price, category, stock, status, images")
-      .eq("approval_status", "approved")
-      .eq("status", "active");
+    try {
+      let q = supabase
+        .from("products")
+        .select("id, name, vendor_name, price, original_price, category, stock, status, images")
+        .eq("approval_status", "approved")
+        .eq("status", "active");
 
-    if (searchQuery.trim()) {
-      const safe = searchQuery.trim().replace(/[%_'(),]/g, " ");
-      q = q.or(`name.ilike.%${safe}%,vendor_name.ilike.%${safe}%,category.ilike.%${safe}%`);
-    }
-    if (selectedCategory !== "all") q = q.eq("category", selectedCategory);
-    if (priceRange[1] < 1000)       q = q.lte("price", priceRange[1]);
-    if (priceRange[0] > 0)          q = q.gte("price", priceRange[0]);
+      if (searchQuery.trim()) {
+        const safe = searchQuery.trim().replace(/[%_'(),]/g, " ");
+        q = q.or(`name.ilike.%${safe}%,vendor_name.ilike.%${safe}%,category.ilike.%${safe}%`);
+      }
+      if (selectedCategory !== "all") q = q.eq("category", selectedCategory);
+      if (selectedVendor !== "all")   q = q.eq("vendor_name", selectedVendor);
+      if (priceRange[1] < 1000)       q = q.lte("price", priceRange[1]);
+      if (priceRange[0] > 0)          q = q.gte("price", priceRange[0]);
 
-    if (sortBy === "price_asc")  q = q.order("price", { ascending: true });
-    else if (sortBy === "price_desc") q = q.order("price", { ascending: false });
-    else q = q.order("created_at", { ascending: false });
+      if (sortBy === "price_asc")  q = q.order("price", { ascending: true });
+      else if (sortBy === "price_desc") q = q.order("price", { ascending: false });
+      else q = q.order("created_at", { ascending: false });
 
-    q = q.limit(96);
+      q = q.limit(96);
 
-    const { data, error } = await q;
+      const { data, error } = await q;
 
-    if (!error) {
-      setFromDb(true);
-      setProducts(data ?? []);
-    } else {
+      if (!error && data && data.length > 0) {
+        setFromDb(true);
+        setProducts(data);
+      } else {
+        setFromDb(false);
+        let filtered = [...MOCK_PRODUCTS];
+        if (searchQuery) filtered = filtered.filter(p =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.vendor_name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        if (selectedCategory !== "all") filtered = filtered.filter(p => p.category === selectedCategory);
+        if (selectedVendor !== "all") filtered = filtered.filter(p => p.vendor_name === selectedVendor);
+        if (priceRange[1] < 1000) filtered = filtered.filter(p => p.price <= priceRange[1]);
+        if (sortBy === "price_asc")  filtered.sort((a, b) => a.price - b.price);
+        if (sortBy === "price_desc") filtered.sort((a, b) => b.price - a.price);
+        setProducts(filtered);
+      }
+    } catch (e) {
       setFromDb(false);
       let filtered = [...MOCK_PRODUCTS];
       if (searchQuery) filtered = filtered.filter(p =>
@@ -109,13 +127,15 @@ function MarketplaceContent() {
         p.vendor_name.toLowerCase().includes(searchQuery.toLowerCase())
       );
       if (selectedCategory !== "all") filtered = filtered.filter(p => p.category === selectedCategory);
+      if (selectedVendor !== "all") filtered = filtered.filter(p => p.vendor_name === selectedVendor);
       if (priceRange[1] < 1000) filtered = filtered.filter(p => p.price <= priceRange[1]);
       if (sortBy === "price_asc")  filtered.sort((a, b) => a.price - b.price);
       if (sortBy === "price_desc") filtered.sort((a, b) => b.price - a.price);
       setProducts(filtered);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [searchQuery, selectedCategory, sortBy, priceRange]);
+  }, [searchQuery, selectedCategory, selectedVendor, sortBy, priceRange]);
 
   useEffect(() => {
     const t = setTimeout(loadProducts, 300);
@@ -137,6 +157,7 @@ function MarketplaceContent() {
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedCategory("all");
+    setSelectedVendor("all");
     setPriceRange([0, 1000]);
     setSortBy("newest");
     setShowFilters(false);
@@ -300,7 +321,7 @@ function MarketplaceContent() {
                 </motion.button>
               </div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Category */}
                 <div>
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Category</label>
@@ -318,6 +339,34 @@ function MarketplaceContent() {
                       >
                         <cat.icon size={14} />
                         {cat.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Vendor */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Vendor</label>
+                  <div className="mt-2 space-y-1">
+                    {[
+                      { id: "all", label: "All Vendors" },
+                      { id: "TechHub Store", label: "TechHub Store" },
+                      { id: "CozyNest Shop", label: "CozyNest Shop" },
+                      { id: "SportZone", label: "SportZone" },
+                      { id: "HomeGoods Co.", label: "HomeGoods Co." },
+                      { id: "WorkSpace Co.", label: "WorkSpace Co." }
+                    ].map(ven => (
+                      <motion.button
+                        key={ven.id}
+                        onClick={() => setSelectedVendor(ven.id)}
+                        className={`flex items-center gap-2 w-full text-left px-3 py-2.5 text-sm rounded-xl transition-all duration-200 ${
+                          selectedVendor === ven.id
+                            ? "bg-black text-white shadow-lg shadow-black/20"
+                            : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                        whileHover={{ x: 4 }}
+                      >
+                        {ven.label}
                       </motion.button>
                     ))}
                   </div>
@@ -401,7 +450,7 @@ function MarketplaceContent() {
               <span className="text-black font-semibold">{products.length}</span>{" "}
               {products.length === 1 ? "product" : "products"}
               {searchQuery && (
-                <> for <span className="text-black font-semibold">"{searchQuery}"</span></>
+                <> for <span className="text-black font-semibold">&ldquo;{searchQuery}&rdquo;</span></>
               )}
               {selectedCategory !== "all" && (
                 <> in <span className="text-black font-semibold">{selectedCategory}</span></>

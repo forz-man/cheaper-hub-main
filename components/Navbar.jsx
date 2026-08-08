@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Search, MessageCircle, LogOut, User, Menu, X,
   ShoppingBag, Heart, Bell, Home, Package, Store,
@@ -69,10 +69,18 @@ function ChevronDownIcon({ size = 20, className = "" }) {
 export default function Navbar() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { count: cartCount, openCart } = useCart();
   const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
   const [profileRole, setProfileRole] = useState(null);
   const userRole = profileRole || metadataRole;
+  const isProtectedPath = !!(
+    pathname?.startsWith("/dashboard") ||
+    pathname === "/vendor-profile" ||
+    pathname === "/messages" ||
+    pathname === "/notifications"
+  );
+  const showAuthControls = !!(user || isProtectedPath);
 
   // Always fetch the latest role from the profiles table so that admin
   // role changes are reflected immediately (the JWT may still carry the
@@ -99,7 +107,12 @@ export default function Navbar() {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [activeLink, setActiveLink] = useState("home");
+  const isActive = (href) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+    return pathname === href;
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const dropdownRef = useRef(null);
@@ -160,7 +173,7 @@ export default function Navbar() {
       router.push("/");
       router.refresh();
     } catch (error) {
-      console.error("Error logging out:", error);
+      console.warn("Error logging out:", error);
     }
   };
 
@@ -219,18 +232,17 @@ export default function Navbar() {
                 <Link
                   key={id}
                   href={href}
-                  onClick={() => setActiveLink(id)}
-                  className={`relative px-2 xl:px-3 py-1.5 xl:py-2 text-xs xl:text-sm font-medium rounded-lg whitespace-nowrap ${
-                    activeLink === id
-                      ? 'text-black bg-gray-100'
-                      : 'text-gray-500 hover:text-black hover:bg-gray-50'
+                  className={`relative px-2 xl:px-3 py-1.5 xl:py-2 text-xs xl:text-sm rounded-lg whitespace-nowrap ${
+                    isActive(href)
+                      ? 'text-black bg-gray-100 font-semibold'
+                      : 'text-gray-500 hover:text-black hover:bg-gray-50 font-medium'
                   }`}
                 >
                   <span className="flex items-center gap-1 xl:gap-1.5">
-                    <Icon size={14} className={activeLink === id ? 'text-black' : 'text-gray-400'} />
+                    <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
                     <span className="hidden xl:inline">{label}</span>
                   </span>
-                  {activeLink === id && (
+                  {isActive(href) && (
                     <span className="absolute bottom-0 left-1/2 w-4 xl:w-6 h-0.5 bg-black -translate-x-1/2"></span>
                   )}
                 </Link>
@@ -262,7 +274,7 @@ export default function Navbar() {
       
             <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
 
-              {user ? (
+              {showAuthControls ? (
                 <>
          
                   <button
@@ -395,13 +407,10 @@ export default function Navbar() {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       onClick={() => { setShowDropdown(!showDropdown); setShowNotifDropdown(false); }}
-                      className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-full hover:bg-gray-100 border-2 border-transparent hover:border-black/20"
+                      className="flex items-center gap-1.5 p-0.5 rounded-full hover:bg-gray-100 border-2 border-transparent hover:border-black/20"
                     >
-                      <div className="relative">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-black flex items-center justify-center text-white text-[10px] sm:text-xs md:text-sm font-bold shadow-md">
-                          {user?.name?.[0] || user?.email?.[0] || "U"}
-                          <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                        </div>
+                      <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-semibold text-sm">
+                        S
                       </div>
                       <ChevronDownIcon size={12} className={`text-gray-400 ${showDropdown ? 'rotate-180' : ''}`} />
                     </button>
@@ -437,15 +446,11 @@ export default function Navbar() {
 
                           <div className="py-1">
                             {[
-                              { icon: User, label: "Profile", href: dashboardTabHref(userRole, "overview") },
-                              { icon: GrDashboard, label: "Dashboard", href: dashboardTabHref(userRole) },
-                              { icon: ShoppingBag, label: "Orders", href: dashboardTabHref(userRole, "orders") },
-                              ...(userRole !== "vendor" && userRole !== "admin"
-                                ? [{ icon: Heart, label: "Wishlist", href: dashboardTabHref(userRole, "wishlist"), badge: wishlistCount }]
-                                : []),
-                              { icon: ShoppingCart, label: "Cart", action: () => { setShowDropdown(false); openCart(); }, badge: cartCount },
-                              { icon: MessageCircle, label: "Messages", href: "/messages", badge: unreadMessages },
-                              { icon: Settings, label: "Settings", href: dashboardTabHref(userRole, "settings") },
+                              { icon: GrDashboard, label: "Dashboard", href: "/dashboard" },
+                              { icon: User, label: "Vendor Profile", href: "/vendor-profile" },
+                              { icon: Heart, label: "Wishlist", href: "/wishlist" },
+                              { icon: ShoppingBag, label: "Orders", href: "/dashboard/orders" },
+                              { icon: Settings, label: "Settings", href: "/settings" },
                             ].map(({ icon: Icon, label, href, badge, action }) => {
                               const cls = "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-black w-full text-left";
                               const inner = (
@@ -472,7 +477,7 @@ export default function Navbar() {
                             className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 mt-1"
                           >
                             <LogOut size={14} className="text-red-400" />
-                            <span>Logout</span>
+                            <span>Sign Out</span>
                           </button>
                         </div>
                       </>
@@ -480,18 +485,11 @@ export default function Navbar() {
                   </div>
                 </>
               ) : (
-            
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <Link
-                    href="/login"
-                    className="hidden sm:block text-xs sm:text-sm font-medium text-gray-600 hover:text-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-gray-100"
-                  >
+                <div className="flex items-center gap-3">
+                  <Link className="text-sm font-medium hover:text-gray-600 px-3 py-2" href="/login">
                     Sign in
                   </Link>
-                  <Link
-                    href="/select-role"
-                    className="bg-black text-white px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold hover:bg-gray-800 whitespace-nowrap"
-                  >
+                  <Link className="bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition" href="/select-role">
                     Get started
                   </Link>
                 </div>
@@ -555,62 +553,63 @@ export default function Navbar() {
                       <Link
                         key={id}
                         href={href}
-                        className={`flex items-center gap-2 px-3 py-2.5 text-xs font-medium ${
-                          activeLink === id
-                            ? 'text-black bg-gray-100'
-                            : 'text-gray-600 hover:text-black hover:bg-gray-50'
+                        className={`flex items-center gap-2 px-3 py-2.5 text-xs ${
+                          isActive(href)
+                            ? 'text-black bg-gray-100 font-semibold'
+                            : 'text-gray-600 hover:text-black hover:bg-gray-50 font-medium'
                         } rounded-lg`}
                         onClick={() => {
-                          setActiveLink(id);
                           setIsMobileMenuOpen(false);
                         }}
                       >
-                        <Icon size={14} className={activeLink === id ? 'text-black' : 'text-gray-400'} />
+                        <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
                         {label}
                       </Link>
                     ))}
                   </div>
 
                  
-                  <div className="border-t border-gray-200 mt-2 pt-2">
-                    <div className="grid grid-cols-4 gap-1">
-                      <Link
-                        href={dashboardTabHref(userRole, "wishlist")}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 ${userRole === "vendor" || userRole === "admin" ? "hidden" : ""}`}
-                      >
-                        <Heart size={20} className="text-gray-600" />
-                        <span className="text-[8px] text-gray-400">Wishlist</span>
-                      </Link>
-                      <button onClick={() => { setIsMobileMenuOpen(false); openCart(); }} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                        <ShoppingCart size={20} className="text-gray-600" />
-                        {cartCount > 0 && (
-                          <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-                            {cartCount}
-                          </span>
-                        )}
-                        <span className="text-[8px] text-gray-400">Cart</span>
-                      </button>
-                      <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                        <MessageCircle size={20} className="text-gray-600" />
-                        {unreadMessages > 0 && (
-                          <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-                            {unreadMessages}
-                          </span>
-                        )}
-                        <span className="text-[8px] text-gray-400">Messages</span>
-                      </Link>
-                      <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                        <Bell size={20} className="text-gray-600" />
-                        {notifUnreadCount > 0 && (
-                          <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                        )}
-                        <span className="text-[8px] text-gray-400">Alerts</span>
-                      </Link>
+                  {showAuthControls && (
+                    <div className="border-t border-gray-200 mt-2 pt-2">
+                      <div className="grid grid-cols-4 gap-1">
+                        <Link
+                          href={dashboardTabHref(userRole, "wishlist")}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 ${userRole === "vendor" || userRole === "admin" ? "hidden" : ""}`}
+                        >
+                          <Heart size={20} className="text-gray-600" />
+                          <span className="text-[8px] text-gray-400">Wishlist</span>
+                        </Link>
+                        <button onClick={() => { setIsMobileMenuOpen(false); openCart(); }} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
+                          <ShoppingCart size={20} className="text-gray-600" />
+                          {cartCount > 0 && (
+                            <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
+                              {cartCount}
+                            </span>
+                          )}
+                          <span className="text-[8px] text-gray-400">Cart</span>
+                        </button>
+                        <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
+                          <MessageCircle size={20} className="text-gray-600" />
+                          {unreadMessages > 0 && (
+                            <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
+                              {unreadMessages}
+                            </span>
+                          )}
+                          <span className="text-[8px] text-gray-400">Messages</span>
+                        </Link>
+                        <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
+                          <Bell size={20} className="text-gray-600" />
+                          {notifUnreadCount > 0 && (
+                            <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                          )}
+                          <span className="text-[8px] text-gray-400">Alerts</span>
+                        </Link>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {!user && (
+                  {!showAuthControls && (
                     <div className="pt-2 space-y-2 border-t border-gray-200 mt-2">
                       <Link
                         href="/login"

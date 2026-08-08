@@ -153,7 +153,7 @@ export default function B2CPage() {
         <section className="py-20 px-4">
           <div className="max-w-[1280px] mx-auto bg-[#131b2e] rounded-[2rem] p-12 md:p-20 text-center">
             <h2 className="text-white text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
-              Start Saving Today — It's Free
+              Start Saving Today — It&apos;s Free
             </h2>
             <p className="text-[#7c839b] text-base mb-10 max-w-2xl mx-auto">
               Join thousands of smart shoppers who never overpay. Track your first product in under 30 seconds.

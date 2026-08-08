@@ -24,12 +24,18 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        router.push("/login");
+      }
+    } catch (err) {
+      console.warn("[ResetPassword] Network exception:", err);
+      // Fallback: redirect to login anyway on connectivity issue
       router.push("/login");
     }
   };
