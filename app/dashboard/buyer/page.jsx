@@ -165,7 +165,7 @@ export default function BuyerDashboard() {
     setOrdersLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, status, payment_status, payment_method, total, created_at, buyer_confirmed_at, payouts_released_at, order_items(id, product_id, product_name, vendor_name, qty, price, payout_status)")
+      .select("id, status, payment_status, total, created_at, buyer_confirmed_at, payouts_released_at, order_items(id, product_id, product_name, vendor_name, qty, price, payout_status)")
       .eq("buyer_id", uid)
       .order("created_at", { ascending: false });
 
@@ -470,7 +470,6 @@ export default function BuyerDashboard() {
                     const firstItem = order.order_items?.[0];
                     const canConfirm = !order.buyer_confirmed_at && order.payment_status === "paid" && ["shipped", "delivered"].includes(normStatus(order.status));
                     const allReleased = order.order_items?.length > 0 && order.order_items.every(i => i.payout_status === "released");
-                    const isEscrowOrder = order.payment_method === "escrow";
                     return (
                       <div key={order.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                         <div className="flex items-start justify-between gap-4">
@@ -490,11 +489,6 @@ export default function BuyerDashboard() {
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${sc.color}`}>
                                   <StatusIcon size={10} /> {sc.label}
                                 </span>
-                                {isEscrowOrder && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 border-amber-100 text-amber-700">
-                                    <Shield size={9} /> Escrow
-                                  </span>
-                                )}
                                 <span className="text-[10px] text-gray-300">{formatDate(order.created_at)}</span>
                                 {normStatus(order.status) === "delivered" && firstItem?.product_id && (() => {
                                   const ek = eligibilityKey(order.id, firstItem.product_id);
@@ -526,7 +520,7 @@ export default function BuyerDashboard() {
                         </div>
 
                         {/* Payment hold / payout status banner */}
-                        {order.payment_status === "paid" && !isEscrowOrder && (
+                        {order.payment_status === "paid" && (
                           <div className={`mt-3 rounded-xl px-3 py-2.5 text-xs flex items-start gap-2 ${
                             allReleased
                               ? "bg-emerald-50 border border-emerald-100 text-emerald-700"
@@ -548,7 +542,7 @@ export default function BuyerDashboard() {
                         )}
 
                         {/* Confirm delivery button */}
-                        {canConfirm && !isEscrowOrder && (
+                        {canConfirm && (
                           <button
                             onClick={() => handleConfirmDelivery(order.id)}
                             disabled={confirmingOrderId === order.id}

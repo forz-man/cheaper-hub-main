@@ -8,7 +8,7 @@ platform's own Stripe balance (not destination charges) — money is captured to
 checkout, then transferred to a vendor's connected account once they mark their order item
 delivered on a paid order.
 
-**Why Express + separate transfers, not destination charges:** the escrow requirement (hold
+**Why Express + separate transfers, not destination charges:** the hold-until-delivery requirement (hold
 money until delivery) only works if the platform receives the full charge itself; destination
 charges route money to the vendor at charge time, which defeats the hold. Transfers are made with
 `source_transaction` = the charge's id (via the order's payment intent's `latest_charge`) so they

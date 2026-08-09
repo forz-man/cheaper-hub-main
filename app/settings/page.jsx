@@ -217,7 +217,7 @@ export default function SettingsPage() {
                       />
                       <div>
                         <span className="text-xs font-bold text-black">Email notifications</span>
-                        <p className="text-[10px] text-gray-400 font-medium">Receive order notifications, payouts alerts, and escrow releases by email.</p>
+                        <p className="text-[10px] text-gray-400 font-medium">Receive order notifications and payout alerts by email.</p>
                       </div>
                     </label>
 

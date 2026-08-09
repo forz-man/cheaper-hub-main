@@ -11,8 +11,6 @@ import { useCart } from "@/lib/cart-context";
 import { requireAuth } from "@/lib/auth-flow";
 import useAuth from "@/hooks/useAuth";
 
-const ESCROW_THRESHOLD = 500;
-
 const COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Netherlands"];
 
 export default function CheckoutPage() {
@@ -269,26 +267,7 @@ export default function CheckoutPage() {
                 <CreditCard size={15} className="text-[#888]" /> Payment method
               </h2>
 
-              {grandTotal >= ESCROW_THRESHOLD ? (
-                /* ── Escrow path ────────────────────────────────────────────── */
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full">
-                      <Shield size={11} /> Escrow.com
-                    </span>
-                    <span className="text-xs text-[#aaa]">Large-order protection</span>
-                  </div>
-                  <p className="text-sm text-[#888] mb-3">
-                    Orders over ${ESCROW_THRESHOLD} are processed through Escrow.com. You&apos;ll be redirected to their secure hosted checkout to pay and verify your identity.
-                  </p>
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700 space-y-1">
-                    <div className="flex items-start gap-1.5"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Funds held in escrow until both you and the seller confirm delivery</div>
-                    <div className="flex items-start gap-1.5"><Shield size={10} className="mt-0.5 flex-shrink-0" /> 3-day inspection window after delivery before funds are released</div>
-                  </div>
-                </div>
-              ) : (
-                /* ── Stripe path ────────────────────────────────────────────── */
-                <div>
+              <div>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-full">
                       <CreditCard size={11} /> Card payment · Stripe
@@ -301,8 +280,7 @@ export default function CheckoutPage() {
                     <div className="flex items-start gap-1.5"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Money held with Cheaper until both you and the seller confirm delivery</div>
                     <div className="flex items-start gap-1.5"><Shield size={10} className="mt-0.5 flex-shrink-0" /> Card data never touches our servers — secured by Stripe</div>
                   </div>
-                </div>
-              )}
+              </div>
             </div>
 
           </div>

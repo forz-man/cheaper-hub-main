@@ -1,33 +1,23 @@
 "use client";
 
-import { use, useEffect, useState, useRef } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Package, ArrowRight, ShoppingBag, Loader2, AlertTriangle, Shield } from "lucide-react";
 import { Suspense } from "react";
 import { useCart } from "@/lib/cart-context";
 
-// Poll the Escrow status endpoint until funded or timeout
-const POLL_INTERVAL_MS = 4000;
-const POLL_MAX_ATTEMPTS = 15; // ~1 minute
-
 function OrderSuccessContent({ id }) {
   const searchParams = useSearchParams();
   const sessionId     = searchParams.get("session_id");
-  const paymentMethod = searchParams.get("payment_method"); // "escrow" for Escrow returns
   const { clearCart } = useCart();
 
   const [order, setOrder]   = useState(null);
   const [paid, setPaid]     = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
-  const [escrowStatus, setEscrowStatus] = useState(null);
-  const pollRef = useRef(null);
 
-  // ── Stripe verify ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (paymentMethod === "escrow") return; // handled separately
-
     if (!sessionId) {
       setError("Missing payment session.");
       setLoading(false);
@@ -45,48 +35,7 @@ function OrderSuccessContent({ id }) {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, id, paymentMethod]);
-
-  // ── Escrow poll ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (paymentMethod !== "escrow") return;
-
-    let attempts = 0;
-
-    async function poll() {
-      try {
-        const res  = await fetch(`/api/escrow/status?order_id=${id}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Could not check escrow status.");
-
-        setOrder(data.order);
-        setEscrowStatus(data.escrowStatus);
-
-        if (data.paid) {
-          setPaid(true);
-          clearCart();
-          clearInterval(pollRef.current);
-          setLoading(false);
-          return;
-        }
-
-        attempts += 1;
-        if (attempts >= POLL_MAX_ATTEMPTS) {
-          clearInterval(pollRef.current);
-          setLoading(false); // show "pending" state — not an error
-        }
-      } catch (err) {
-        setError(err.message);
-        clearInterval(pollRef.current);
-        setLoading(false);
-      }
-    }
-
-    poll(); // immediate first check
-    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
-    return () => clearInterval(pollRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, paymentMethod]);
+  }, [sessionId, id]);
 
   const total     = order?.total ?? 0;
   const name      = order?.buyer_name || "there";
@@ -98,9 +47,7 @@ function OrderSuccessContent({ id }) {
       <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
         <div className="text-center">
           <Loader2 size={24} className="animate-spin text-[#ccc] mx-auto mb-3" />
-          {paymentMethod === "escrow" && (
-            <p className="text-sm text-[#888]">Waiting for escrow confirmation…</p>
-          )}
+          <p className="text-sm text-[#888]">Confirming your Stripe payment…</p>
         </div>
       </div>
     );
@@ -124,59 +71,6 @@ function OrderSuccessContent({ id }) {
     );
   }
 
-  // ── Escrow pending (buyer returned but hasn't funded yet) ────────────────
-  if (paymentMethod === "escrow" && !paid) {
-    return (
-      <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
-        <div className="w-full max-w-md text-center">
-          <div className="flex justify-center mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-[#111] flex items-center justify-center">
-                <span className="text-white font-bold text-sm" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-              </div>
-              <span className="font-bold text-lg" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
-            </Link>
-          </div>
-          <div className="bg-white border border-[#e2ddd6] rounded-2xl p-8 mb-5">
-            <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center mx-auto mb-5">
-              <Shield size={28} className="text-amber-500" />
-            </div>
-            <h1 className="text-xl font-bold text-[#111] mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
-              Escrow payment pending
-            </h1>
-            <p className="text-sm text-[#888] mb-4">
-              Complete the payment on Escrow.com to finalize your order. Your funds will be held securely until delivery is confirmed.
-            </p>
-            {escrowStatus && (
-              <p className="text-xs text-[#aaa] mb-4">
-                Escrow status: <span className="font-semibold text-[#555]">{escrowStatus}</span>
-              </p>
-            )}
-            <div className="flex flex-col gap-3 mt-6">
-              {order?.escrow_redirect_url && (
-                <a
-                  href={order.escrow_redirect_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-[#111] text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-[#333] transition-colors"
-                >
-                  Complete on Escrow.com <ArrowRight size={14} />
-                </a>
-              )}
-              <button
-                onClick={() => window.location.reload()}
-                className="border border-[#e2ddd6] text-[#555] px-5 py-3 rounded-xl text-sm font-semibold hover:border-[#999] transition-colors"
-              >
-                Refresh status
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Stripe not paid ──────────────────────────────────────────────────────
   if (!paid) {
     return (
       <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
@@ -197,8 +91,6 @@ function OrderSuccessContent({ id }) {
   }
 
   // ── Success ──────────────────────────────────────────────────────────────
-  const isEscrow = paymentMethod === "escrow";
-
   return (
     <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
       <div className="w-full max-w-md">
@@ -221,10 +113,7 @@ function OrderSuccessContent({ id }) {
             Order placed!
           </h1>
           <p className="text-sm text-[#888] mb-6">
-            Thanks, {name.split(" ")[0]}.{" "}
-            {isEscrow
-              ? "Your payment is held in escrow and will be released to the seller after delivery is confirmed."
-              : "Your card has been charged and the funds are held by Cheaper. Payment is released to the seller only after both you and the seller confirm delivery."}
+            Thanks, {name.split(" ")[0]}. Your card has been charged and the funds are held by Cheaper. Payment is released to the seller only after both you and the seller confirm delivery.
           </p>
 
           <div className="bg-[#f9f8f6] border border-[#e2ddd6] rounded-xl p-5 mb-6 text-left space-y-3">
@@ -242,9 +131,7 @@ function OrderSuccessContent({ id }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#888]">Payment via</span>
-              <span className="font-semibold text-[#111] flex items-center gap-1">
-                {isEscrow ? <><Shield size={11} className="text-amber-500" /> Escrow.com</> : "Card"}
-              </span>
+                <span className="font-semibold text-[#111]">Card · Stripe</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#888]">Status</span>
@@ -276,20 +163,16 @@ function OrderSuccessContent({ id }) {
           </div>
 
           {/* Payment hold notice */}
-          {!isEscrow && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5 text-left flex items-start gap-2.5">
-              <Shield size={14} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-indigo-700 leading-relaxed">
-                <span className="font-semibold">Your payment is held by Cheaper.</span>{" "}
-                Once the seller ships and marks delivery, go to <strong>My Orders</strong> in your dashboard and tap <strong>&ldquo;Confirm I received this order&rdquo;</strong> — that releases payment to the seller.
-              </p>
-            </div>
-          )}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5 text-left flex items-start gap-2.5">
+            <Shield size={14} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-indigo-700 leading-relaxed">
+              <span className="font-semibold">Your payment is held by Cheaper.</span>{" "}
+              Once the seller ships and marks delivery, go to <strong>My Orders</strong> in your dashboard and tap <strong>&ldquo;Confirm I received this order&rdquo;</strong> — that releases payment to the seller.
+            </p>
+          </div>
 
           <p className="text-xs text-[#aaa] mb-6">
-            {isEscrow
-              ? "Funds are held securely in escrow. You'll confirm delivery before payment is released to the seller."
-              : "You'll get a notification when your order ships."}
+            You&apos;ll get a notification when your order ships.
           </p>
 
           <div className="flex flex-col gap-3">
