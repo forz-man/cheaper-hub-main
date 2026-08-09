@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import { dashboardTabHref } from "@/lib/auth";
 import { GrDashboard } from "react-icons/gr";
-import { label } from "framer-motion/client";
+import { getUserInitial } from "@/lib/utils";
 
 function formatNotifTime(iso) {
   if (!iso) return "";
@@ -67,12 +67,25 @@ function ChevronDownIcon({ size = 20, className = "" }) {
 }
 
 export default function Navbar() {
-  const { user, loading: authLoading } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    if (authUser) {
+      setUser(authUser);
+    } else if (authUser === null) {
+      setUser(null);
+    }
+  }, [authUser]);
+
   const router = useRouter();
   const pathname = usePathname();
   const { count: cartCount, openCart } = useCart();
   const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
   const [profileRole, setProfileRole] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const displayInitial = getUserInitial(profile, user);
   const userRole = profileRole || metadataRole;
   const isProtectedPath = !!(
     pathname?.startsWith("/dashboard") ||
@@ -82,17 +95,25 @@ export default function Navbar() {
   );
   const showAuthControls = !!(user || isProtectedPath);
 
-  // Always fetch the latest role from the profiles table so that admin
-  // role changes are reflected immediately (the JWT may still carry the
-  // old user_metadata.role until the next token refresh).
   useEffect(() => {
-    if (!user?.id || !supabase) return;
-    let cancelled = false;
-    supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
-      if (!cancelled && data?.role) setProfileRole(data.role);
-    });
-    return () => { cancelled = true; };
-  }, [user?.id]);
+    async function loadProfile() {
+      if (!supabase) return;
+      const { data: { user: authUserVal } } = await supabase.auth.getUser();
+      if (authUserVal) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', authUserVal.id).single();
+        if (data) {
+          setProfile(data);
+          if (data.role) {
+            setProfileRole(data.role);
+          }
+        }
+      } else if (user === null) {
+        setProfile(null);
+        setProfileRole(null);
+      }
+    }
+    loadProfile();
+  }, [user]);
 
   const {
     items: notifItems,
@@ -167,14 +188,13 @@ export default function Navbar() {
     };
   }, [isMobileMenuOpen]);
 
-  const handleLogout = async () => {
-    try {
+  const handleSignOut = async () => {
+    if (supabase) {
       await supabase.auth.signOut();
-      router.push("/");
-      router.refresh();
-    } catch (error) {
-      console.warn("Error logging out:", error);
     }
+    setProfile(null);
+    setUser(null);
+    window.location.href = '/login';
   };
 
   const handleSearch = (e) => {
@@ -407,12 +427,13 @@ export default function Navbar() {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       onClick={() => { setShowDropdown(!showDropdown); setShowNotifDropdown(false); }}
-                      className="flex items-center gap-1.5 p-0.5 rounded-full hover:bg-gray-100 border-2 border-transparent hover:border-black/20"
+                      className="relative w-10 h-10 rounded-full overflow-hidden bg-black text-white flex items-center justify-center border border-gray-200 cursor-pointer"
                     >
-                      <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-semibold text-sm">
-                        S
-                      </div>
-                      <ChevronDownIcon size={12} className={`text-gray-400 ${showDropdown ? 'rotate-180' : ''}`} />
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <span>{displayInitial}</span>
+                      )}
                     </button>
 
           
@@ -424,15 +445,19 @@ export default function Navbar() {
 
                           <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-100">
                             <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black flex items-center justify-center text-white text-xs sm:text-sm font-bold shadow-md">
-                                {user?.name?.[0] || user?.email?.[0] || "U"}
+                              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-black text-white flex items-center justify-center border border-gray-200">
+                                {avatarUrl ? (
+                                  <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover rounded-full" />
+                                ) : (
+                                  <span>{displayInitial}</span>
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <p className="text-xs sm:text-sm font-semibold text-black truncate">
-                                  {user?.name || "User"}
+                                  {profile?.full_name || profile?.fullName || user?.user_metadata?.full_name || "User"}
                                 </p>
                                 <p className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[150px]">
-                                  {user?.email}
+                                  {profile?.email || user?.email}
                                 </p>
                               </div>
                             </div>
@@ -473,7 +498,7 @@ export default function Navbar() {
                           </div>
 
                           <button
-                            onClick={handleLogout}
+                            onClick={handleSignOut}
                             className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 mt-1"
                           >
                             <LogOut size={14} className="text-red-400" />
