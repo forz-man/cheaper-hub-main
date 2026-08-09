@@ -25,8 +25,12 @@ export async function POST(request) {
     const safeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
       ? next
       : null;
-    const callbackUrl = new URL("/auth/callback", new URL(request.url).origin);
+    const callbackUrl = new URL("/api/auth/callback", new URL(request.url).origin);
     if (safeNext) callbackUrl.searchParams.set("next", safeNext);
+    callbackUrl.searchParams.set("signup", "1");
+    if (role === "buyer" || role === "vendor") {
+      callbackUrl.searchParams.set("role", role);
+    }
 
     if (isPlaceholder) {
       console.log("[API Registration] Placeholder mode active. Mocking user sign up for:", email);
