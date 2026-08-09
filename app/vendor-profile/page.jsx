@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useAuth from "@/hooks/useAuth";
 import useProfile from "@/hooks/useProfile";
+import useVendorStats from "@/hooks/useVendorStats";
 import { supabase } from "@/lib/supabase";
 import { 
   User, Store, Mail, Phone, Globe, MapPin, Calendar, 
@@ -17,6 +18,7 @@ export default function VendorProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading, error, updateProfile, setProfile } = useProfile();
+  const vendorStats = useVendorStats(user?.id);
   const [activeTab, setActiveTab] = useState("Overview");
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -388,10 +390,10 @@ export default function VendorProfilePage() {
         {/* ── STAT METRICS CARDS ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Listings", value: Number(profile?.listings_count ?? 0), icon: ListCollapse, color: "text-blue-600 bg-blue-50 border-blue-100" },
-            { label: "Live inventory", value: Number(profile?.inventory_count ?? 0), icon: Store, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-            { label: "Deals", value: Number(profile?.deals_count ?? 0), icon: BarChart3, color: "text-purple-600 bg-purple-50 border-purple-100" },
-            { label: "Revenue", value: `$${Number(profile?.revenue ?? 0).toFixed(2)}`, icon: Award, color: "text-amber-600 bg-amber-50 border-amber-100" }
+            { label: "Listings", value: vendorStats.loading ? "…" : vendorStats.listings, icon: ListCollapse, color: "text-blue-600 bg-blue-50 border-blue-100" },
+            { label: "Live inventory", value: vendorStats.loading ? "…" : vendorStats.inventory, icon: Store, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+            { label: "Deals", value: vendorStats.loading ? "…" : vendorStats.deals, icon: BarChart3, color: "text-purple-600 bg-purple-50 border-purple-100" },
+            { label: "Revenue", value: vendorStats.loading ? "…" : `$${vendorStats.revenue.toFixed(2)}`, icon: Award, color: "text-amber-600 bg-amber-50 border-amber-100" }
           ].map((stat, idx) => (
             <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
               <div className={`p-3 rounded-xl border ${stat.color} flex-shrink-0`}>
