@@ -127,6 +127,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="email"
             className="w-full h-12 rounded-xl border border-gray-200 px-4 outline-none focus:border-gray-950"
           />
 
@@ -137,6 +138,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full h-12 rounded-xl border border-gray-200 px-4 pr-16 outline-none focus:border-gray-950"
             />
             <button

@@ -296,7 +296,7 @@ export default function WishlistPage() {
               <div className="space-y-1 max-w-sm mx-auto">
                 <h3 className="text-lg font-bold text-black">Your Wishlist is Empty</h3>
                 <p className="text-sm text-gray-400 font-medium">
-                  You haven't added any items to your wishlist yet.
+                  You haven&apos;t added any items to your wishlist yet.
                 </p>
               </div>
               <Link 

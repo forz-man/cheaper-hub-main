@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Reusable artifact templates are not part of this app's source tree.
+    ".local/skills/artifacts/**",
   ]),
 ]);
 
