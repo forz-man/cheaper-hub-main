@@ -12,6 +12,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawRole = searchParams.get("role");
+  const next = searchParams.get("next");
   const role = (rawRole === "seller" || rawRole === "vendor") ? "vendor" : (rawRole === "buyer" ? "buyer" : null);
 
   // No role chosen yet (e.g. someone landed on /register directly) —
@@ -60,7 +61,14 @@ function RegisterForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail, password, fullName: trimmedFullName, username: cleanUsername, role }),
+         body: JSON.stringify({
+           email: trimmedEmail,
+           password,
+           fullName: trimmedFullName,
+           username: cleanUsername,
+           role,
+           next,
+         }),
       });
       const result = await res.json();
 
@@ -80,7 +88,8 @@ function RegisterForm() {
         } catch (storageErr) {
           console.warn("Failed to store registered user metadata locally:", storageErr);
         }
-        router.push(`/verify-email?email=${encodeURIComponent(trimmedEmail)}`);
+         const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+         router.push(`/verify-email?email=${encodeURIComponent(trimmedEmail)}${nextParam}`);
       } else {
         console.warn("[Registration] SignUp response contains no user data");
         setError("Sign-up succeeded, but no user record was returned by the database.");
@@ -187,7 +196,7 @@ function RegisterForm() {
 
         <p className="mt-5 text-center text-sm text-[#888]">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-[#111] hover:underline">Sign in</Link>
+           <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-semibold text-[#111] hover:underline">Sign in</Link>
         </p>
       </AuthCard>
     </AuthShell>

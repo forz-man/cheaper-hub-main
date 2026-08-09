@@ -9,6 +9,7 @@ import AuthCard from "@/components/auth/AuthCard";
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
+  const next = searchParams.get("next");
 
   return (
     <AuthShell>
@@ -30,7 +31,7 @@ function VerifyEmailContent() {
 
           <div className="space-y-3">
             <Link
-              href="/login"
+              href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
               className="block w-full h-11 rounded-lg border border-[#e2ddd6] text-[#111] text-sm font-semibold flex items-center justify-center hover:bg-gray-50 transition-colors"
             >
               Back to sign in

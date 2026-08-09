@@ -8,12 +8,16 @@ import AuthCard from "@/components/auth/AuthCard";
 import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import { login } from "@/lib/auth";
 import useAuth from "@/hooks/useAuth";
+import { getAuthIntent, normalizeReturnTo } from "@/lib/auth-flow";
 
 function LoginForm() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
+  const next = normalizeReturnTo(
+    searchParams.get("next") || getAuthIntent()?.returnTo,
+    "/dashboard",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -165,7 +169,7 @@ function LoginForm() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Don&apos;t have an account?{" "}
-          <Link href="/select-role" className="font-semibold text-gray-950">
+            <Link href={`/select-role?next=${encodeURIComponent(next)}`} className="font-semibold text-gray-950">
             Create Account
           </Link>
         </p>

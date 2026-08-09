@@ -4,7 +4,7 @@ import dns from "dns";
 
 export async function POST(request) {
   try {
-    const { email, password, fullName, username, role } = await request.json();
+    const { email, password, fullName, username, role, next } = await request.json();
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -22,6 +22,11 @@ export async function POST(request) {
     const isValidUrl = trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://");
     const isValidKey = trimmedKey.length > 0;
     const isPlaceholder = !isValidUrl || !isValidKey || trimmedUrl.includes("placeholder.supabase.co");
+    const safeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
+      ? next
+      : null;
+    const callbackUrl = new URL("/auth/callback", new URL(request.url).origin);
+    if (safeNext) callbackUrl.searchParams.set("next", safeNext);
 
     if (isPlaceholder) {
       console.log("[API Registration] Placeholder mode active. Mocking user sign up for:", email);
@@ -69,7 +74,7 @@ export async function POST(request) {
           username,
           role,
         },
-        emailRedirectTo: `${new URL(request.url).origin}/auth/callback`,
+        emailRedirectTo: callbackUrl.toString(),
       },
     });
 

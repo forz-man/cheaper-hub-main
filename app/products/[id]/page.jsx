@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Star, Heart, ShoppingBag, Package,
   Shield, Truck, RefreshCw, Share2,
@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import useAuth from "@/hooks/useAuth";
+import { requireAuth } from "@/lib/auth-flow";
 import StarRating from "@/components/reviews/StarRating";
 import ReviewCard from "@/components/reviews/ReviewCard";
 
@@ -86,6 +87,7 @@ function normalizeProduct(raw) {
 export default function ProductPage({ params }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
   const [product, setProduct] = useState(() => {
@@ -116,6 +118,14 @@ export default function ProductPage({ params }) {
   }, [id]);
 
   const handleToggleWishlist = async () => {
+    if (!user) {
+      requireAuth(router, {
+        type: "wishlist_toggle",
+        context: { productId: String(id) },
+      });
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
     const storageKey = user ? `cheaper_wishlist_ids_${user.id}` : "cheaper_wishlist_ids";
     
@@ -139,7 +149,9 @@ export default function ProductPage({ params }) {
   };
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
-  const [activeTab, setActiveTab] = useState("description");
+  const [activeTab, setActiveTab] = useState(
+    () => searchParams.get("tab") === "reviews" ? "reviews" : "description",
+  );
   const [copied, setCopied] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
 
@@ -157,11 +169,25 @@ export default function ProductPage({ params }) {
   const [reviewSubmitSuccess, setReviewSubmitSuccess] = useState(false);
 
   const handleBuyNow = () => {
+    if (!user) {
+      requireAuth(router, {
+        type: "buy_now",
+        context: { product, qty },
+      });
+      return;
+    }
     addItem(product, qty);
     router.push("/checkout");
   };
 
   const handleAddToCart = () => {
+    if (!user) {
+      requireAuth(router, {
+        type: "add_to_cart",
+        context: { product, qty },
+      });
+      return;
+    }
     addItem(product, qty);
     openCart();
     setAddedToCart(true);
@@ -171,8 +197,13 @@ export default function ProductPage({ params }) {
   // Contact Seller Handler - Navigates directly to Messages page
   const handleContactSeller = async () => {
     if (!user) {
-      alert("Please login to contact the seller.");
-      router.push("/login");
+      requireAuth(router, {
+        type: "message_seller",
+        context: {
+          sellerId: product?.vendor_id,
+          productId: product?.id,
+        },
+      });
       return;
     }
 
@@ -236,6 +267,20 @@ export default function ProductPage({ params }) {
   }, [id]);
 
   const fetchReviews = useCallback(async () => {
+    // Mock catalog IDs are intentionally non-UUID placeholders. Do not send
+    // them to the Supabase-backed reviews endpoint, which expects UUIDs.
+    const mockProduct = MOCK_PRODUCTS[String(id)];
+    if (mockProduct) {
+      setReviews([]);
+      setReviewStats({
+        average: mockProduct.rating || 0,
+        total: mockProduct.reviews || 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      });
+      setReviewsLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/reviews?product_id=${id}`);
       if (!res.ok) return;
@@ -272,7 +317,11 @@ export default function ProductPage({ params }) {
 
   const handleSubmitReview = async () => {
     if (!user) {
-      router.push("/login");
+      requireAuth(router, {
+        type: "review",
+        context: { productId: String(id) },
+        returnTo: `${window.location.pathname}?tab=reviews`,
+      });
       return;
     }
     if (reviewFormRating < 1) {

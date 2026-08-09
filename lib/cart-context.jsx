@@ -1,13 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import useAuth from "@/hooks/useAuth";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const mergedUserRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -20,11 +23,38 @@ export function CartProvider({ children }) {
     setTimeout(() => setHydrated(true), 0);
   }, []);
 
+  // Merge an anonymous cart into the signed-in user's cart instead of
+  // discarding it during the login redirect/resume flow.
+  useEffect(() => {
+    if (!hydrated || !user?.id || mergedUserRef.current === user.id) return;
+    mergedUserRef.current = user.id;
+
+    try {
+      const accountKey = `cheaper_cart_${user.id}`;
+      const accountItems = JSON.parse(localStorage.getItem(accountKey) || "[]");
+      const anonymousItems = JSON.parse(localStorage.getItem("cheaper_cart") || "[]");
+      const merged = [...accountItems];
+
+      for (const incoming of anonymousItems) {
+        const existing = merged.find((item) => item.id === incoming.id);
+        if (existing) existing.qty += Math.max(1, Number(incoming.qty) || 1);
+        else merged.push({ ...incoming, qty: Math.max(1, Number(incoming.qty) || 1) });
+      }
+
+      setItems(merged);
+      localStorage.setItem(accountKey, JSON.stringify(merged));
+      localStorage.removeItem("cheaper_cart");
+    } catch {
+      // Keep the in-memory cart usable if storage is unavailable.
+    }
+  }, [hydrated, user?.id]);
+
   useEffect(() => {
     if (hydrated) {
-      localStorage.setItem("cheaper_cart", JSON.stringify(items));
+      const key = user?.id ? `cheaper_cart_${user.id}` : "cheaper_cart";
+      localStorage.setItem(key, JSON.stringify(items));
     }
-  }, [items, hydrated]);
+  }, [items, hydrated, user?.id]);
 
   const addItem = useCallback((product, qty = 1) => {
     setItems(prev => {

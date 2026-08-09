@@ -11,6 +11,7 @@ function SelectRoleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromOAuth = searchParams.get("from") === "oauth";
+  const next = searchParams.get("next");
 
   const [loading, setLoading] = useState(null); // tracks which role is loading
   const [error, setError] = useState("");
@@ -43,7 +44,8 @@ function SelectRoleContent() {
         setLoading(null);
       }
     } else {
-      router.push(`/register?role=${urlRole}`);
+      const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+      router.push(`/register?role=${urlRole}${nextParam}`);
     }
   };
 

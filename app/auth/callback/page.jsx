@@ -4,6 +4,7 @@ import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveUserRole, destinationForRole } from "@/lib/auth";
+import { normalizeReturnTo } from "@/lib/auth-flow";
 
 async function resolveDestination(session) {
   if (!session?.user) return "/login";
@@ -27,11 +28,12 @@ async function resolveDestination(session) {
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const next = normalizeReturnTo(searchParams.get("next"), null);
 
   useEffect(() => {
     async function handleCallback() {
       if (!supabase) {
-        router.replace("/login");
+        router.replace(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
         return;
       }
 
@@ -41,7 +43,8 @@ function CallbackHandler() {
 
       if (error) {
         console.warn("OAuth error:", error, errorDescription);
-        router.replace("/login?error=" + encodeURIComponent(errorDescription || error));
+        const errorQuery = `error=${encodeURIComponent(errorDescription || error)}`;
+        router.replace(next ? `/login?${errorQuery}&next=${encodeURIComponent(next)}` : `/login?${errorQuery}`);
         return;
       }
 
@@ -49,17 +52,18 @@ function CallbackHandler() {
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) {
           console.warn("Code exchange failed:", exchangeError.message);
-          router.replace("/login?error=" + encodeURIComponent(exchangeError.message));
+          const errorQuery = `error=${encodeURIComponent(exchangeError.message)}`;
+          router.replace(next ? `/login?${errorQuery}&next=${encodeURIComponent(next)}` : `/login?${errorQuery}`);
           return;
         }
-        const dest = await resolveDestination(data?.session);
+        const dest = next || await resolveDestination(data?.session);
         router.replace(dest);
         return;
       }
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const dest = await resolveDestination(session);
+        const dest = next || await resolveDestination(session);
         router.replace(dest);
         return;
       }
@@ -67,14 +71,14 @@ function CallbackHandler() {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === "SIGNED_IN" && session) {
           subscription.unsubscribe();
-          const dest = await resolveDestination(session);
+          const dest = next || await resolveDestination(session);
           router.replace(dest);
         }
       });
 
       setTimeout(() => {
         subscription.unsubscribe();
-        router.replace("/login");
+        router.replace(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
       }, 10000);
     }
 

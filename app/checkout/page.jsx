@@ -8,7 +8,8 @@ import {
   Truck, CreditCard, Loader2, ChevronRight, Minus, Plus, Lock,
 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
-import { supabase } from "@/lib/supabase";
+import { requireAuth } from "@/lib/auth-flow";
+import useAuth from "@/hooks/useAuth";
 
 const ESCROW_THRESHOLD = 500;
 
@@ -17,8 +18,8 @@ const COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia", "Ge
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, updateQty, removeItem, clearCart, total, count, hydrated } = useCart();
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  const [user, setUser] = useState(null);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,17 +29,19 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUser(user);
-        setForm(prev => ({
-          ...prev,
-          name: user.user_metadata?.full_name || prev.name,
-          email: user.email || prev.email,
-        }));
-      }
-    });
-  }, []);
+    if (!authUser) return;
+    setForm(prev => ({
+      ...prev,
+      name: authUser.user_metadata?.full_name || prev.name,
+      email: authUser.email || prev.email,
+    }));
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authLoading && !authUser) {
+      requireAuth(router, { type: "checkout", returnTo: "/checkout" });
+    }
+  }, [authLoading, authUser, router]);
 
   const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -54,7 +57,7 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      if (!user) {
+       if (!authUser) {
         setError("Please sign in to check out.");
         setPlacing(false);
         return;
@@ -85,6 +88,14 @@ export default function CheckoutPage() {
       setPlacing(false);
     }
   };
+
+  if (authLoading || (!authUser && !hydrated)) {
+    return (
+      <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center">
+        <div className="w-7 h-7 border-2 border-[#111] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (hydrated && count === 0 && !placing) {
     return (

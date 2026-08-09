@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { Package, Heart, Eye, ShoppingBag, TrendingUp, Sparkles, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCart } from "@/lib/cart-context";
+import useAuth from "@/hooks/useAuth";
+import { requireAuth } from "@/lib/auth-flow";
 import StarRating from "@/components/reviews/StarRating";
 import { supabase } from "@/lib/supabase";
 
 const ProductCard = ({ product }) => {
   const { addItem, openCart } = useCart();
+  const { user } = useAuth();
+  const router = useRouter();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
@@ -53,6 +58,14 @@ const ProductCard = ({ product }) => {
   const reviews = dbReviewCount ?? product.reviews ?? 0;
 
   const handleWishlist = async (e) => {
+    if (!user) {
+      requireAuth(router, {
+        type: "wishlist_toggle",
+        context: { productId: product.id },
+      });
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
     
@@ -79,6 +92,14 @@ const ProductCard = ({ product }) => {
   };
 
   const handleAddToCart = (e) => {
+    if (!user) {
+      requireAuth(router, {
+        type: "add_to_cart",
+        context: { product },
+      });
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
     addItem(product);

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import CartDrawer from "@/components/CartDrawer";
+import AuthIntentResume from "@/components/auth/AuthIntentResume";
 
 function CartDrawerWrapper() {
   return <CartDrawer />;
@@ -53,6 +54,7 @@ export default function Providers({ children }) {
     <AuthProvider>
       <CartProvider>
         {children}
+        <AuthIntentResume />
         <CartDrawerWrapper />
       </CartProvider>
     </AuthProvider>

@@ -18,6 +18,18 @@ const PUBLIC_ROUTES = new Set([
   "/api/reviews",
 ]);
 
+// Only these user-owned pages are auth-gated. Marketplace, product detail,
+// search, filters, deals, contact, and sustainability remain public.
+const AUTH_ROUTES = [
+  "/checkout",
+  "/messages",
+  "/wishlist",
+  "/dashboard",
+  "/settings",
+  "/vendor-profile",
+  "/notifications",
+];
+
 const ADMIN_ROUTES = [
   "/dashboard/admin",
   "/api/admin",
@@ -26,6 +38,14 @@ const ADMIN_ROUTES = [
 
 function isAdminRoute(pathname) {
   return ADMIN_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
+}
+
+function isAuthRoute(pathname) {
+  return AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
+}
+
+function isPublicApiRoute(pathname) {
+  return pathname === "/api/products" || pathname === "/api/reviews" || pathname === "/api/contact";
 }
 
 const isPlaceholder =
@@ -42,7 +62,11 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_ROUTES.has(pathname)) {
+  if (
+    PUBLIC_ROUTES.has(pathname) ||
+    (!pathname.startsWith("/api/") && !isAuthRoute(pathname) && !isAdminRoute(pathname)) ||
+    isPublicApiRoute(pathname)
+  ) {
     return NextResponse.next();
   }
 
@@ -121,7 +145,8 @@ export async function proxy(request) {
       return NextResponse.json({ message: "Authentication required" }, { status: 401 });
     }
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
+    // Preserve the complete path, query, and filters for exact return.
+    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

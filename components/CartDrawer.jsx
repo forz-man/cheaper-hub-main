@@ -8,10 +8,13 @@ import {
   ArrowRight, Truck,
 } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
+import useAuth from "@/hooks/useAuth";
+import { requireAuth } from "@/lib/auth-flow";
 
 export default function CartDrawer() {
   const router = useRouter();
   const { items, updateQty, removeItem, clearCart, count, total, cartOpen, closeCart } = useCart();
+  const { user } = useAuth();
 
   const shipping = total >= 50 ? 0 : total === 0 ? 0 : 4.99;
   const toFreeShipping = Math.max(0, 50 - total);
@@ -185,8 +188,14 @@ export default function CartDrawer() {
               <span>${(total + shipping).toFixed(2)}</span>
             </div>
             <Link
-              href="/checkout"
-              onClick={closeCart}
+              href={user ? "/checkout" : "#"}
+              onClick={(event) => {
+                if (!user) {
+                  event.preventDefault();
+                  requireAuth(router, { type: "checkout", returnTo: "/checkout" });
+                }
+                closeCart();
+              }}
               className="flex items-center justify-center gap-2 w-full bg-[#111] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#333] transition-colors"
             >
               Proceed to checkout <ArrowRight size={15} />

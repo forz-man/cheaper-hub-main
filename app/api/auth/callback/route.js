@@ -3,11 +3,24 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { resolveUserRole, destinationForRole } from "@/lib/auth";
 
+function isSafeReturnTo(value) {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
+}
+
+function loginRedirect(origin, next, error) {
+  const params = new URLSearchParams();
+  if (isSafeReturnTo(next)) params.set("next", next);
+  if (error) params.set("error", error);
+  const query = params.toString();
+  return new URL(`/login${query ? `?${query}` : ""}`, origin);
+}
+
 export async function GET(request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
+  const next = requestUrl.searchParams.get("next");
 
   console.log("[auth/callback] GET", {
     code: code ? code.slice(0, 8) + "..." : null,
@@ -38,13 +51,13 @@ export async function GET(request) {
   if (error) {
     console.error("[auth/callback] OAuth error from provider:", errorDescription || error);
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(errorDescription || error)}`, origin)
+      loginRedirect(origin, next, errorDescription || error)
     );
   }
 
   if (!code) {
     console.warn("[auth/callback] No code in URL query params");
-    return NextResponse.redirect(new URL("/login", origin));
+    return NextResponse.redirect(loginRedirect(origin, next));
   }
 
   const cookieStore = await cookies();
@@ -74,7 +87,7 @@ export async function GET(request) {
   if (exchangeError) {
     console.error("[auth/callback] Exchange error:", exchangeError.message);
     const response = NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(exchangeError.message)}`, origin)
+      loginRedirect(origin, next, exchangeError.message)
     );
     return response;
   }
@@ -88,7 +101,7 @@ export async function GET(request) {
   const user = data?.session?.user;
   if (!user) {
     console.warn("[auth/callback] No user in session after exchange");
-    const response = NextResponse.redirect(new URL("/login", origin));
+    const response = NextResponse.redirect(loginRedirect(origin, next));
     return response;
   }
 
@@ -126,7 +139,7 @@ export async function GET(request) {
     }
   }
 
-  const dest = destinationForRole(role);
+  const dest = isSafeReturnTo(next) ? next : destinationForRole(role);
   console.log("[auth/callback] Redirecting to:", dest, "role:", role);
 
   const response = NextResponse.redirect(new URL(dest, origin));

@@ -1,0 +1,37 @@
+Implement authentication so the marketplace uses "open browsing, gated checkout" — NOT a full auth wall.
+
+Requirements:
+
+1. PUBLIC (no auth required):
+   - Home/landing page
+   - Marketplace listing pages (browse all products)
+   - Individual product/listing detail pages
+   - Search and filters
+   - Seller profile pages (public info only)
+
+2. AUTH-GATED (require login/signup):
+   - Placing an order / checkout
+   - Adding items to cart (or at minimum, checking out with cart)
+   - Messaging a seller
+   - Saving/favoriting a listing
+   - Viewing order history / account dashboard
+   - Leaving a review
+
+3. REDIRECT FLOW (critical — implement this precisely):
+   - When an unauthenticated user clicks a gated action (e.g. "Buy Now", "Checkout", "Message Seller"):
+     a. Save the intended action + relevant context (e.g. product ID, cart contents, or the full return URL) — in session storage, a query param, or a signed redirect token.
+     b. Redirect them to /login (or /signup).
+     c. After successful auth, redirect them BACK to the exact page/action they intended — do not just send them to the homepage or dashboard.
+     d. If they were trying to add something to cart or start checkout, resume that action automatically once authed (e.g. re-add the item, reopen checkout) instead of making them repeat the click.
+
+4. Middleware/route protection:
+   - Use route-level middleware to protect only the specific gated routes (checkout, messaging, favorites, account) — not a blanket wrapper on the whole app.
+   - Public routes should render fully for logged-out users, including real data (not placeholder/blurred content).
+
+5. Edge cases to handle:
+   - If a logged-out user has items in a local/session cart and then logs in, merge that cart into their account cart.
+   - If the login/signup flow fails or is cancelled, keep them on the original product page instead of losing context.
+
+Tech stack: [fill in — e.g. Next.js + NextAuth, Express + Passport, Supabase Auth, Firebase Auth, etc.]
+
+Please implement this with clear comments showing where the auth check happens and where the redirect-and-resume logic lives.
