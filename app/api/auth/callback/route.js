@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { resolveUserRole, destinationForRole } from "@/lib/auth";
+import { normalizeRole, resolveUserRole, destinationForRole } from "@/lib/auth";
 
 function isSafeReturnTo(value) {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
@@ -105,37 +105,48 @@ export async function GET(request) {
     return response;
   }
 
-  // Role the user chose before OAuth (encoded in the redirectTo URL)
-  const pendingRole = requestUrl.searchParams.get("role");
+  // A signup flow sends the selected role in the callback URL. Only allow
+  // known roles, and never let an OAuth provider's default metadata override
+  // the user's explicit buyer/vendor choice for a new profile.
+  const pendingRole = normalizeRole(requestUrl.searchParams.get("role"));
+  const isSignup = requestUrl.searchParams.get("signup") === "1";
 
-  let role = resolveUserRole(user, null);
-  console.log("[auth/callback] Resolved role from user metadata:", role);
-
-  if (!role) {
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      role = resolveUserRole(user, profile?.role);
-      console.log("[auth/callback] Resolved role from DB profile:", role);
-    } catch {
-      console.log("[auth/callback] No profile found in DB");
-    }
+  let profileRole = null;
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    profileRole = normalizeRole(profile?.role);
+  } catch {
+    console.log("[auth/callback] No profile found in DB");
   }
 
-  // Brand-new OAuth user with no role yet — apply the one they chose
-  if (!role && pendingRole) {
+  let role = resolveUserRole(user, profileRole);
+  console.log("[auth/callback] Resolved existing role:", role, "profileRole:", profileRole);
+
+  // New OAuth signup: the selected role is authoritative when no profile
+  // exists. This also handles providers/mock sessions that return default
+  // metadata such as "buyer" before the callback can persist our role.
+  if (!profileRole && isSignup && (pendingRole === "buyer" || pendingRole === "vendor")) {
     try {
-      console.log("[auth/callback] Applying pending role:", pendingRole);
-      await supabase.auth.updateUser({ data: { role: pendingRole } });
-      await supabase
+      console.log("[auth/callback] Applying selected signup role:", pendingRole);
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { role: pendingRole },
+      });
+      if (updateError) throw updateError;
+
+      role = pendingRole;
+      const { error: profileError } = await supabase
         .from("profiles")
         .upsert({ id: user.id, role: pendingRole }, { onConflict: "id" });
-      role = pendingRole;
+      if (profileError) {
+        console.warn("[auth/callback] Profile role upsert failed:", profileError.message);
+      }
     } catch (err) {
-      console.error("[auth/callback] Failed to apply pending role:", err);
+      console.error("[auth/callback] Failed to persist selected signup role:", err);
+      role = null;
     }
   }
 
