@@ -384,7 +384,17 @@ export default function VendorDashboard() {
     setSaveError(null);
 
     const finalCategory = (form.category && form.category.trim()) ? form.category.trim() : "General";
-    const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Seller";
+    const { data: vendorProfile } = await supabase
+      .from("profiles")
+      .select("store_name, full_name")
+      .eq("id", user?.id)
+      .maybeSingle();
+    const displayName =
+      vendorProfile?.store_name ||
+      vendorProfile?.full_name ||
+      user?.user_metadata?.full_name ||
+      user?.email?.split("@")[0] ||
+      "Seller";
     
     try {
       const payload = {

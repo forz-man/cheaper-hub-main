@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import useAuth from "@/hooks/useAuth";
 import { requireAuth } from "@/lib/auth-flow";
+import { mergeVendorProfile } from "@/lib/vendor-display";
 import StarRating from "@/components/reviews/StarRating";
 import ReviewCard from "@/components/reviews/ReviewCard";
 
@@ -259,7 +260,15 @@ export default function ProductPage({ params }) {
       if (error || !data) {
         setNotFound(true);
       } else {
-        setProduct(normalizeProduct(data));
+        const normalizedProduct = normalizeProduct(data);
+        const { data: vendorProfile } = data.vendor_id
+          ? await supabase
+              .from("profiles")
+              .select("id, store_name, full_name, email, phone_number, phone, location, bio, avatar_url")
+              .eq("id", data.vendor_id)
+              .maybeSingle()
+          : { data: null };
+        setProduct(mergeVendorProfile(normalizedProduct, vendorProfile));
       }
       setDbLoading(false);
     }
@@ -764,9 +773,17 @@ export default function ProductPage({ params }) {
             <div className="bg-white border border-[#e2ddd6] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#111] flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs font-bold">{(product.vendor_name || "S")[0]}</span>
-                  </div>
+                  {product.vendor_avatar_url ? (
+                    <img
+                      src={product.vendor_avatar_url}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#111] flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">{(product.vendor_name || "S")[0]}</span>
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="font-semibold text-sm text-[#111]">{product.vendor_name}</div>

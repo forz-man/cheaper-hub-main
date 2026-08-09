@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
+import { mergeVendorProfiles } from "@/lib/vendor-display";
 
 const MOCK_PRODUCTS = [
   { id: "1", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics" },
@@ -73,13 +74,10 @@ export default function MarketplacePage() {
     setProductsLoading(true);
     let q = supabase
       .from("products")
-      .select("id, name, vendor_name, price, original_price, category, stock, status, images")
+      .select("id, name, vendor_id, vendor_name, price, original_price, category, stock, status, images")
       .eq("approval_status", "approved")
       .eq("status", "active");
 
-    if (search.trim()) {
-      q = q.or(`name.ilike.%${search}%,vendor_name.ilike.%${search}%,category.ilike.%${search}%`);
-    }
     if (category) q = q.eq("category", category);
     if (maxPrice < 500) q = q.lte("price", maxPrice);
 
@@ -92,8 +90,24 @@ export default function MarketplacePage() {
     const { data, error } = await q;
 
     if (!error && data && data.length > 0) {
+      const vendorIds = [...new Set(data.map((product) => product.vendor_id).filter(Boolean))];
+      const { data: profiles } = vendorIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, store_name, full_name, avatar_url")
+            .in("id", vendorIds)
+        : { data: [] };
+      let liveProducts = mergeVendorProfiles(data, profiles || []);
+      const normalizedSearch = search.trim().toLowerCase();
+      if (normalizedSearch) {
+        liveProducts = liveProducts.filter((product) =>
+          [product.name, product.vendor_name, product.category]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(normalizedSearch))
+        );
+      }
       setFromDb(true);
-      setProducts(data);
+      setProducts(liveProducts);
     } else {
       setFromDb(false);
       let filtered = [...MOCK_PRODUCTS];

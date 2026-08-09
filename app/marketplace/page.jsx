@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import ProductCard from "@/components/ProductCard";
+import { mergeVendorProfiles } from "@/lib/vendor-display";
 
 const MOCK_PRODUCTS = [
   { id: "m1", name: "ASUS ROG Strix G16 Gaming Laptop", vendor_name: "TechHub Store", price: 1399.99, original_price: 1599.99, rating: 4.8, reviews: 156, category: "Electronics", image: "/products/rog-laptop.png", image_url: "/products/rog-laptop.png", images: ["/products/rog-laptop.png"] },
@@ -68,6 +69,13 @@ function MarketplaceContent() {
   const [sortBy, setSortBy]               = useState("newest");
   const [priceRange, setPriceRange]       = useState([0, 1000]);
 
+  const vendorOptions = useMemo(() => {
+    const names = products
+      .map((product) => product.vendor_name)
+      .filter(Boolean);
+    return ["all", ...new Set(names)];
+  }, [products]);
+
   // Keep the search box in sync if the ?q= param changes from elsewhere
   // (e.g. navbar/hero search while already on this page).
   useEffect(() => {
@@ -81,16 +89,11 @@ function MarketplaceContent() {
     try {
       let q = supabase
         .from("products")
-        .select("id, name, vendor_name, price, original_price, category, stock, status, images")
+        .select("id, name, vendor_id, vendor_name, price, original_price, category, stock, status, images")
         .eq("approval_status", "approved")
         .eq("status", "active");
 
-      if (searchQuery.trim()) {
-        const safe = searchQuery.trim().replace(/[%_'(),]/g, " ");
-        q = q.or(`name.ilike.%${safe}%,vendor_name.ilike.%${safe}%,category.ilike.%${safe}%`);
-      }
       if (selectedCategory !== "all") q = q.eq("category", selectedCategory);
-      if (selectedVendor !== "all")   q = q.eq("vendor_name", selectedVendor);
       if (priceRange[1] < 1000)       q = q.lte("price", priceRange[1]);
       if (priceRange[0] > 0)          q = q.gte("price", priceRange[0]);
 
@@ -103,8 +106,27 @@ function MarketplaceContent() {
       const { data, error } = await q;
 
       if (!error && data && data.length > 0) {
+        const vendorIds = [...new Set(data.map((product) => product.vendor_id).filter(Boolean))];
+        const { data: profiles } = vendorIds.length
+          ? await supabase
+              .from("profiles")
+              .select("id, store_name, full_name, avatar_url")
+              .in("id", vendorIds)
+          : { data: [] };
+        let liveProducts = mergeVendorProfiles(data, profiles || []);
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+        if (normalizedSearch) {
+          liveProducts = liveProducts.filter((product) =>
+            [product.name, product.vendor_name, product.category]
+              .filter(Boolean)
+              .some((value) => value.toLowerCase().includes(normalizedSearch))
+          );
+        }
+        if (selectedVendor !== "all") {
+          liveProducts = liveProducts.filter((product) => product.vendor_name === selectedVendor);
+        }
         setFromDb(true);
-        setProducts(data);
+        setProducts(liveProducts);
       } else {
         setFromDb(false);
         let filtered = [...MOCK_PRODUCTS];
@@ -348,14 +370,9 @@ function MarketplaceContent() {
                 <div>
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Vendor</label>
                   <div className="mt-2 space-y-1">
-                    {[
-                      { id: "all", label: "All Vendors" },
-                      { id: "TechHub Store", label: "TechHub Store" },
-                      { id: "CozyNest Shop", label: "CozyNest Shop" },
-                      { id: "SportZone", label: "SportZone" },
-                      { id: "HomeGoods Co.", label: "HomeGoods Co." },
-                      { id: "WorkSpace Co.", label: "WorkSpace Co." }
-                    ].map(ven => (
+                    {vendorOptions.map((vendor) => {
+                      const ven = { id: vendor, label: vendor === "all" ? "All Vendors" : vendor };
+                      return (
                       <motion.button
                         key={ven.id}
                         onClick={() => setSelectedVendor(ven.id)}
@@ -368,7 +385,8 @@ function MarketplaceContent() {
                       >
                         {ven.label}
                       </motion.button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
