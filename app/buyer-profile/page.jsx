@@ -144,6 +144,7 @@ export default function BuyerProfilePage() {
       location: profile?.location || "",
       bio: profile?.bio || "",
       avatar_url: profile?.avatar_url || "",
+      avatar_file: null,
     });
     setSaveError(null);
     setSaveSuccess(false);
@@ -157,22 +158,19 @@ export default function BuyerProfilePage() {
     try {
       let finalAvatarUrl = editForm.avatar_url || "";
 
-      if (finalAvatarUrl.startsWith("data:image/")) {
+      if (editForm.avatar_file) {
         setIsUploading(true);
-        const response = await fetch(finalAvatarUrl);
-        const blob = await response.blob();
-        const fileExt = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
-        const filePath = `${user.id}-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(filePath, blob, { cacheControl: "3600", upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from("avatars")
-          .getPublicUrl(filePath);
-        finalAvatarUrl = publicUrlData.publicUrl;
+        const formData = new FormData();
+        formData.append("file", editForm.avatar_file);
+        const uploadResponse = await fetch("/api/profile/avatar", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResponse.ok) {
+          throw new Error(uploadResult.message || "Profile image upload failed.");
+        }
+        finalAvatarUrl = uploadResult.url;
       }
 
       const result = await updateProfile({
@@ -375,7 +373,11 @@ export default function BuyerProfilePage() {
                         const reader = new FileReader();
                         reader.onload = () => {
                           if (typeof reader.result === "string") {
-                            setEditForm((current) => ({ ...current, avatar_url: reader.result }));
+                            setEditForm((current) => ({
+                              ...current,
+                              avatar_url: URL.createObjectURL(file),
+                              avatar_file: file,
+                            }));
                             setSaveError(null);
                           }
                         };
