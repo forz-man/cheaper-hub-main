@@ -20,6 +20,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
+  Upload,
   User,
   X,
 } from "lucide-react";
@@ -48,6 +49,7 @@ export default function BuyerProfilePage() {
   const [editForm, setEditForm] = useState({});
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [stats, setStats] = useState({
     orders: 0,
     delivered: 0,
@@ -139,7 +141,6 @@ export default function BuyerProfilePage() {
     setEditForm({
       full_name: profile?.full_name || displayName,
       phone_number: profile?.phone_number || profile?.phone || "",
-      website: profile?.website || "",
       location: profile?.location || "",
       bio: profile?.bio || "",
       avatar_url: profile?.avatar_url || "",
@@ -153,25 +154,50 @@ export default function BuyerProfilePage() {
     event?.preventDefault();
     setSaveError(null);
     setSaveSuccess(false);
-    const result = await updateProfile({
-      full_name: editForm.full_name?.trim() || displayName,
-      phone_number: editForm.phone_number?.trim() || "",
-      phone: editForm.phone_number?.trim() || "",
-      website: editForm.website?.trim() || "",
-      location: editForm.location?.trim() || "",
-      bio: editForm.bio?.trim() || "",
-      avatar_url: editForm.avatar_url?.trim() || "",
-    });
+    try {
+      let finalAvatarUrl = editForm.avatar_url || "";
 
-    if (result?.error) {
-      setSaveError(result.error.message || "Could not save your profile.");
-      return;
+      if (finalAvatarUrl.startsWith("data:image/")) {
+        setIsUploading(true);
+        const response = await fetch(finalAvatarUrl);
+        const blob = await response.blob();
+        const fileExt = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
+        const filePath = `${user.id}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, blob, { cacheControl: "3600", upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(filePath);
+        finalAvatarUrl = publicUrlData.publicUrl;
+      }
+
+      const result = await updateProfile({
+        full_name: editForm.full_name?.trim() || displayName,
+        phone_number: editForm.phone_number?.trim() || "",
+        phone: editForm.phone_number?.trim() || "",
+        location: editForm.location?.trim() || "",
+        bio: editForm.bio?.trim() || "",
+        avatar_url: finalAvatarUrl,
+      });
+
+      if (result?.error) {
+        setSaveError(result.error.message || "Could not save your profile.");
+        return;
+      }
+
+      if (result.data) setProfile(result.data);
+      setIsEditing(false);
+      setSaveSuccess(true);
+      window.setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (saveErr) {
+      setSaveError(saveErr.message || "Could not upload or save your profile picture.");
+    } finally {
+      setIsUploading(false);
     }
-
-    if (result.data) setProfile(result.data);
-    setIsEditing(false);
-    setSaveSuccess(true);
-    window.setTimeout(() => setSaveSuccess(false), 4000);
   }
 
   if (loading) {
@@ -299,9 +325,7 @@ export default function BuyerProfilePage() {
                 { label: "Full name", field: "full_name", icon: User },
                 { label: "Email address", value: profile?.email || user?.email, icon: Mail, disabled: true },
                 { label: "Phone number", field: "phone_number", icon: Phone },
-                { label: "Website", field: "website", icon: Search },
                 { label: "Location", field: "location", icon: MapPin },
-                { label: "Avatar URL", field: "avatar_url", icon: User },
               ].map((field) => (
                 <div key={field.label} className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-400">{field.label}</label>
@@ -319,6 +343,53 @@ export default function BuyerProfilePage() {
                   </div>
                 </div>
               ))}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-400">Profile picture</label>
+                {isEditing ? (
+                  <label className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:border-gray-400 transition">
+                    {editForm.avatar_url ? (
+                      <img
+                        src={editForm.avatar_url}
+                        alt="Selected profile preview"
+                        className="w-9 h-9 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                        <User size={14} className="text-gray-400" />
+                      </div>
+                    )}
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                      <Upload size={13} /> Choose image
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        if (!file.type.startsWith("image/")) {
+                          setSaveError("Please choose an image file.");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === "string") {
+                            setEditForm((current) => ({ ...current, avatar_url: reader.result }));
+                            setSaveError(null);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
+                    <User size={14} className="text-gray-400" />
+                    <span className="text-sm text-gray-700">Saved to your profile</span>
+                  </div>
+                )}
+              </div>
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="text-xs font-semibold text-gray-400">About you</label>
                 {isEditing ? (
@@ -338,7 +409,7 @@ export default function BuyerProfilePage() {
               {isEditing && (
                 <div className="sm:col-span-2 flex justify-end">
                   <button type="submit" className="bg-black text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1.5">
-                    <Save size={14} /> Save changes
+                    <Save size={14} /> {isUploading ? "Uploading…" : "Save changes"}
                   </button>
                 </div>
               )}
