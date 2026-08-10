@@ -12,7 +12,7 @@ module.exports = defineConfig({
   workers: 1, // Running sequentially to prevent auth conflicts
   reporter: 'line',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:5000',
     trace: 'on-first-retry',
     headless: false,
     launchOptions: {
@@ -27,7 +27,7 @@ module.exports = defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:5000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },

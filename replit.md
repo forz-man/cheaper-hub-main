@@ -55,7 +55,9 @@ Run all files in `supabase/migrations/` in the Supabase SQL Editor. They are all
 ## Dev Server
 
 ```bash
-npm run dev   # starts on port 5000
+npm run dev   # standard Node.js/Next.js dev server on port 5000
+npm run build # production build used by Vercel
+npm start     # serves the production build locally
 ```
 
 ## User Preferences
