@@ -90,7 +90,7 @@ export default function Navbar() {
     userRole === "vendor"
       ? "/vendor-profile"
       : userRole === "buyer"
-        ? "/dashboard/buyer"
+        ? "/buyer-profile"
         : "/dashboard";
   const profileLabel =
     userRole === "vendor"
@@ -101,6 +101,7 @@ export default function Navbar() {
   const isProtectedPath = !!(
     pathname?.startsWith("/dashboard") ||
     pathname === "/vendor-profile" ||
+    pathname === "/buyer-profile" ||
     pathname === "/messages" ||
     pathname === "/notifications"
   );
