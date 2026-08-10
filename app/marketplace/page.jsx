@@ -13,18 +13,6 @@ import { useCart } from "@/lib/cart-context";
 import ProductCard from "@/components/ProductCard";
 import { mergeVendorProfiles } from "@/lib/vendor-display";
 
-const MOCK_PRODUCTS = [
-  { id: "m1", name: "ASUS ROG Strix G16 Gaming Laptop", vendor_name: "TechHub Store", price: 1399.99, original_price: 1599.99, rating: 4.8, reviews: 156, category: "Electronics", image: "/products/rog-laptop.png", image_url: "/products/rog-laptop.png", images: ["/products/rog-laptop.png"] },
-  { id: "m2", name: "Apple iPhone 14", vendor_name: "TechHub Store", price: 699.99, original_price: 799.99, rating: 4.7, reviews: 284, category: "Electronics", image: "/products/iphone14.png", image_url: "/products/iphone14.png", images: ["/products/iphone14.png"] },
-  { id: "m3", name: "Sony WH-1000XM5", vendor_name: "TechHub Store", price: 349.99, original_price: 399.99, rating: 4.9, reviews: 412, category: "Electronics", image: "/products/sony-headphones.png", image_url: "/products/sony-headphones.png", images: ["/products/sony-headphones.png"] },
-  { id: "m4", name: "Samsung Galaxy S25 Ultra", vendor_name: "TechHub Store", price: 1199.99, original_price: 1299.99, rating: 4.9, reviews: 92, category: "Electronics", image: "/products/samsung-s25.png", image_url: "/products/samsung-s25.png", images: ["/products/samsung-s25.png"] },
-  { id: "m5", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics", image: "/products/airpods-pro.png", image_url: "/products/airpods-pro.png", images: ["/products/airpods-pro.png"] },
-  { id: "m6", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home", image: "/products/throw-blanket.png", image_url: "/products/throw-blanket.png", images: ["/products/throw-blanket.png"] },
-  { id: "m7", name: "Running Shoes X2", vendor_name: "SportZone", price: 44.99, original_price: 89.99, rating: 4.7, reviews: 215, category: "Sports", image: "/products/running-shoes.png", image_url: "/products/running-shoes.png", images: ["/products/running-shoes.png"] },
-  { id: "m8", name: "Ceramic Mug Set (4)", vendor_name: "HomeGoods Co.", price: 12.50, original_price: 24.00, rating: 5.0, reviews: 87, category: "Home", image: "/products/ceramic-mugs.png", image_url: "/products/ceramic-mugs.png", images: ["/products/ceramic-mugs.png"] },
-  { id: "m9", name: "Standing Desk Pro", vendor_name: "WorkSpace Co.", price: 249.99, original_price: 349.99, rating: 4.7, reviews: 203, category: "Electronics", image: "/products/standing-desk.png", image_url: "/products/standing-desk.png", images: ["/products/standing-desk.png"] }
-];
-
 const CATEGORIES = [
   { id: "all",         label: "All Products",     icon: Package },
   { id: "Electronics", label: "Electronics",      icon: Zap },
@@ -105,7 +93,7 @@ function MarketplaceContent() {
 
       const { data, error } = await q;
 
-      if (!error && data && data.length > 0) {
+      if (!error) {
         const vendorIds = [...new Set(data.map((product) => product.vendor_id).filter(Boolean))];
         const { data: profiles } = vendorIds.length
           ? await supabase
@@ -129,31 +117,11 @@ function MarketplaceContent() {
         setProducts(liveProducts);
       } else {
         setFromDb(false);
-        let filtered = [...MOCK_PRODUCTS];
-        if (searchQuery) filtered = filtered.filter(p =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.vendor_name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        if (selectedCategory !== "all") filtered = filtered.filter(p => p.category === selectedCategory);
-        if (selectedVendor !== "all") filtered = filtered.filter(p => p.vendor_name === selectedVendor);
-        if (priceRange[1] < 1000) filtered = filtered.filter(p => p.price <= priceRange[1]);
-        if (sortBy === "price_asc")  filtered.sort((a, b) => a.price - b.price);
-        if (sortBy === "price_desc") filtered.sort((a, b) => b.price - a.price);
-        setProducts(filtered);
+        setProducts([]);
       }
     } catch (e) {
       setFromDb(false);
-      let filtered = [...MOCK_PRODUCTS];
-      if (searchQuery) filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.vendor_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      if (selectedCategory !== "all") filtered = filtered.filter(p => p.category === selectedCategory);
-      if (selectedVendor !== "all") filtered = filtered.filter(p => p.vendor_name === selectedVendor);
-      if (priceRange[1] < 1000) filtered = filtered.filter(p => p.price <= priceRange[1]);
-      if (sortBy === "price_asc")  filtered.sort((a, b) => a.price - b.price);
-      if (sortBy === "price_desc") filtered.sort((a, b) => b.price - a.price);
-      setProducts(filtered);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -478,7 +446,7 @@ function MarketplaceContent() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <p className="text-xs text-gray-400">
-              {fromDb ? "Live data" : "Demo data"} · {viewMode === "grid" ? "Grid" : "List"} view
+              {fromDb ? "Live data" : "No live data"} · {viewMode === "grid" ? "Grid" : "List"} view
             </p>
           </div>
         </div>

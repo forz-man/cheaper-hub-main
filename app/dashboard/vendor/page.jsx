@@ -944,7 +944,7 @@ export default function VendorDashboard() {
                   value={form.name}
                   onChange={handleFormChange}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black"
-                  placeholder="e.g. Wireless Earbuds Pro"
+                  placeholder="e.g. Premium wireless headphones"
                 />
               </div>
 

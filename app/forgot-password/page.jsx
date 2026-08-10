@@ -28,9 +28,8 @@ export default function ForgotPasswordPage() {
         setLoading(false);
       }
     } catch (err) {
-      console.warn("[ForgotPassword] Network exception:", err);
-      // Fallback: simulate success to prevent blocking error popups
-      setSent(true);
+      console.error("[ForgotPassword] Network exception:", err);
+      setError("Unable to connect to Supabase. Please try again.");
       setLoading(false);
     }
   };

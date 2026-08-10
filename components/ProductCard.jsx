@@ -118,7 +118,7 @@ const ProductCard = ({ product }) => {
       <div className="relative h-52 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center overflow-hidden">
         {(product.image || product.image_url || product.images?.[0]) ? (
           <motion.img
-            src={product.image || product.image_url || product.images?.[0] || '/products/rog-laptop.png'}
+            src={product.image || product.image_url || product.images?.[0]}
             alt={product.name}
             className="w-full h-full object-contain p-4"
             animate={{ scale: isHovered ? 1.06 : 1 }}

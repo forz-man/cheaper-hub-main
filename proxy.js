@@ -49,10 +49,6 @@ function isPublicApiRoute(pathname) {
   return pathname === "/api/products" || pathname === "/api/reviews" || pathname === "/api/contact";
 }
 
-const isPlaceholder =
-  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  !process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith("http");
-
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -75,8 +71,8 @@ export async function proxy(request) {
 
   let response = NextResponse.next({ request });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://invalid.supabase.co";
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "invalid-anon-key";
 
   const supabase = createServerClient(
     supabaseUrl,
@@ -100,34 +96,11 @@ export async function proxy(request) {
   );
 
   let user = null;
-  if (isPlaceholder) {
-    const mockSessionCookie = request.cookies.get("cheaper_mock_session")?.value;
-    if (mockSessionCookie) {
-      try {
-        const session = JSON.parse(decodeURIComponent(mockSessionCookie));
-        user = session?.user || null;
-      } catch (err) {
-        console.error("[middleware] parse mock session cookie failed:", err);
-      }
-    }
-  } else {
-    try {
-      const { data } = await supabase.auth.getUser();
-      user = data?.user || null;
-    } catch (err) {
-      console.error("[middleware] getUser failed:", err);
-    }
-    if (!user) {
-      const mockSessionCookie = request.cookies.get("cheaper_mock_session")?.value;
-      if (mockSessionCookie) {
-        try {
-          const session = JSON.parse(decodeURIComponent(mockSessionCookie));
-          user = session?.user || null;
-        } catch (err) {
-          console.error("[middleware] parse mock session cookie in real mode failed:", err);
-        }
-      }
-    }
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  } catch (err) {
+    console.error("[middleware] getUser failed:", err);
   }
 
   console.log("[middleware] User:", user?.email || "none");
@@ -153,32 +126,22 @@ export async function proxy(request) {
 
   // Admin route role check
   if (isAdminRoute(pathname)) {
-    if (isPlaceholder) {
-      const userRole = user?.user_metadata?.role || user?.app_metadata?.role;
-      if (userRole !== "admin") {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.role !== "admin") {
         if (pathname.startsWith("/api/")) {
           return NextResponse.json({ message: "Admin access required" }, { status: 403 });
         }
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
-    } else {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (profile?.role !== "admin") {
-          if (pathname.startsWith("/api/")) {
-            return NextResponse.json({ message: "Admin access required" }, { status: 403 });
-          }
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        }
-      } catch (err) {
-        console.error("[middleware] admin check failed:", err);
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
+    } catch (err) {
+      console.error("[middleware] admin check failed:", err);
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 

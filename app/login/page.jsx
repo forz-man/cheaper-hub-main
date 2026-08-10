@@ -62,35 +62,8 @@ function LoginForm() {
       // Redirect back to the saved URL (or /dashboard which handles role routing)
       router.replace(next);
     } catch (err) {
-      console.warn("[Login] Network exception, using fallback mock session:", err);
-      
-      const targetEmail = email || "user@example.com";
-      const resolvedRole = targetEmail.toLowerCase().includes("vendor") ? "vendor" : "buyer";
-      
-      const user = {
-        id: "mock-user-id-12345",
-        email: targetEmail,
-        email_confirmed_at: new Date().toISOString(),
-        user_metadata: {
-          full_name: targetEmail.split("@")[0] || "Demo User",
-          role: resolvedRole,
-        },
-        app_metadata: {
-          role: resolvedRole,
-        },
-      };
-
-      const session = {
-        access_token: "mock-access-token",
-        user,
-      };
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cheaper_fallback_session", JSON.stringify(session));
-        document.cookie = `cheaper_mock_session=${encodeURIComponent(JSON.stringify(session))}; path=/; max-age=604800; SameSite=Lax`;
-      }
-
-      router.replace(next);
+      console.error("[Login] Network exception:", err);
+      setError("Unable to connect to Supabase. Please try again.");
       setLoading(false);
     }
   };

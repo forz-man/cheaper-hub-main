@@ -153,24 +153,6 @@ const HeroSection = () => {
 
             <motion.div 
               variants={itemVariants}
-              className="flex flex-wrap justify-center lg:justify-start gap-2 mb-5"
-            >
-              {["Wireless Earbuds", "Sneakers", "Home Decor", "Organic Food"].map((tag, index) => (
-                <motion.button 
-                  key={tag} 
-                  className="px-3 py-1 bg-white border border-gray-200 rounded-full text-[10px] text-gray-600 font-medium hover:border-black hover:text-black hover:shadow-md transition-all duration-300"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 + index * 0.05 }}
-                >
-                  {tag}
-                </motion.button>
-              ))}
-            </motion.div>
-
-            <motion.div 
-              variants={itemVariants}
               className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3"
             >
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

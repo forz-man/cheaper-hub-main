@@ -55,18 +55,6 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15, stiffness: 100 } },
 };
 
-const FALLBACK_DEALS = [
-  { id: "m1", name: "ASUS ROG Strix G16 Gaming Laptop", vendor_name: "TechHub Store", price: 1399.99, original_price: 1599.99, rating: 4.8, reviews: 156, category: "Electronics", image: "/products/rog-laptop.png", image_url: "/products/rog-laptop.png", images: ["/products/rog-laptop.png"], discount_pct: 13, sold_count: 45 },
-  { id: "m2", name: "Apple iPhone 14", vendor_name: "TechHub Store", price: 699.99, original_price: 799.99, rating: 4.7, reviews: 284, category: "Electronics", image: "/products/iphone14.png", image_url: "/products/iphone14.png", images: ["/products/iphone14.png"], discount_pct: 13, sold_count: 82 },
-  { id: "m3", name: "Sony WH-1000XM5", vendor_name: "TechHub Store", price: 349.99, original_price: 399.99, rating: 4.9, reviews: 412, category: "Electronics", image: "/products/sony-headphones.png", image_url: "/products/sony-headphones.png", images: ["/products/sony-headphones.png"], discount_pct: 13, sold_count: 124 },
-  { id: "m4", name: "Samsung Galaxy S25 Ultra", vendor_name: "TechHub Store", price: 1199.99, original_price: 1299.99, rating: 4.9, reviews: 92, category: "Electronics", image: "/products/samsung-s25.png", image_url: "/products/samsung-s25.png", images: ["/products/samsung-s25.png"], discount_pct: 8, sold_count: 15 },
-  { id: "m5", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics", image: "/products/airpods-pro.png", image_url: "/products/airpods-pro.png", images: ["/products/airpods-pro.png"], discount_pct: 50, sold_count: 230 },
-  { id: "m6", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home", image: "/products/throw-blanket.png", image_url: "/products/throw-blanket.png", images: ["/products/throw-blanket.png"], discount_pct: 50, sold_count: 76 },
-  { id: "m7", name: "Running Shoes X2", vendor_name: "SportZone", price: 44.99, original_price: 89.99, rating: 4.7, reviews: 215, category: "Sports", image: "/products/running-shoes.png", image_url: "/products/running-shoes.png", images: ["/products/running-shoes.png"], discount_pct: 50, sold_count: 112 },
-  { id: "m8", name: "Ceramic Mug Set (4)", vendor_name: "HomeGoods Co.", price: 12.50, original_price: 24.00, rating: 5.0, reviews: 87, category: "Home", image: "/products/ceramic-mugs.png", image_url: "/products/ceramic-mugs.png", images: ["/products/ceramic-mugs.png"], discount_pct: 48, sold_count: 38 },
-  { id: "m9", name: "Standing Desk Pro", vendor_name: "WorkSpace Co.", price: 249.99, original_price: 349.99, rating: 4.7, reviews: 203, category: "Electronics", image: "/products/standing-desk.png", image_url: "/products/standing-desk.png", images: ["/products/standing-desk.png"], discount_pct: 29, sold_count: 54 }
-];
-
 const DealsPage = () => {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -93,14 +81,12 @@ const DealsPage = () => {
             return;
           }
         }
-        // Fallback to mock deals on empty array or non-200 response
-        console.warn("Deals API offline or unconfigured, loading fallback deals:", "empty/non-200");
-        setDeals(FALLBACK_DEALS);
-        setError(false);
+        setDeals([]);
+        setError(!response.ok);
       } catch (err) {
-        console.warn("Deals API offline or unconfigured, loading fallback deals:", err);
-        setDeals(FALLBACK_DEALS);
-        setError(false);
+        console.error("Unable to load live deals:", err);
+        setDeals([]);
+        setError(true);
       } finally {
         setLoading(false);
       }

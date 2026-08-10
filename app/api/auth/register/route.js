@@ -21,7 +21,6 @@ export async function POST(request) {
 
     const isValidUrl = trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://");
     const isValidKey = trimmedKey.length > 0;
-    const isPlaceholder = !isValidUrl || !isValidKey || trimmedUrl.includes("placeholder.supabase.co");
     const safeNext = typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
       ? next
       : null;
@@ -31,26 +30,6 @@ export async function POST(request) {
     if (role === "buyer" || role === "vendor") {
       callbackUrl.searchParams.set("role", role);
     }
-
-    if (isPlaceholder) {
-      console.log("[API Registration] Placeholder mode active. Mocking user sign up for:", email);
-      const user = {
-        id: "mock-user-id-12345",
-        email: email || "user@example.com",
-        email_confirmed_at: null,
-        user_metadata: {
-          full_name: fullName,
-          username,
-          role,
-        },
-        app_metadata: {
-          role,
-        },
-      };
-      return NextResponse.json({ success: true, data: { session: null, user } });
-    }
-
-    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "DEFINED" : "UNDEFINED");
 
     // Perform DNS lookup check to prevent unhandled fetch rejections for unresolvable domains
     try {

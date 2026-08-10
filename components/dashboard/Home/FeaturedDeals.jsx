@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 
 
@@ -14,14 +15,18 @@ const FeaturedDeals = ({ products, loading }) => {
             <h2 className="text-2xl font-bold text-black">Today&apos;s Deals</h2>
             <p className="text-sm text-gray-400 mt-1">Curated daily by our team</p>
           </div>
-          <a href="#" className="flex items-center gap-1 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
+          <Link href="/deals" className="flex items-center gap-1 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
             View all <ChevronRight size={15} />
-          </a>
+          </Link>
         </div>
         
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="text-gray-400">Loading products...</div>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-12 text-sm text-gray-400">
+            No live deals available yet.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">

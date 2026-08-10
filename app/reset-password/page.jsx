@@ -34,9 +34,9 @@ export default function ResetPasswordPage() {
         router.push("/login");
       }
     } catch (err) {
-      console.warn("[ResetPassword] Network exception:", err);
-      // Fallback: redirect to login anyway on connectivity issue
-      router.push("/login");
+      console.error("[ResetPassword] Network exception:", err);
+      setError("Unable to connect to Supabase. Please try again.");
+      setLoading(false);
     }
   };
 

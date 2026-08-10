@@ -14,13 +14,6 @@ import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
 import ReviewModal from "@/components/reviews/ReviewModal";
 
-const mockWishlist = [
-  { id: "5", name: "Standing Desk Pro", seller: "WorkSpace Co.", price: 249.99, was: 349.99, rating: 4.7, reviews: 203 },
-  { id: "6", name: "Air Purifier HEPA", seller: "CleanAir Shop", price: 89.00, was: 129.00, rating: 4.9, reviews: 87 },
-  { id: "7", name: "Leather Wallet Slim", seller: "Craft & Co.", price: 34.00, was: 54.00, rating: 4.6, reviews: 145 },
-  { id: "8", name: "Smart Plug (4-pack)", seller: "TechHub Store", price: 19.99, was: 29.99, rating: 4.8, reviews: 412 },
-];
-
 const statusConfig = {
   delivered: { label: "Delivered", color: "text-emerald-700 bg-emerald-50 border-emerald-100", Icon: CheckCircle },
   shipped:   { label: "Shipped",   color: "text-blue-700 bg-blue-50 border-blue-100",         Icon: Truck       },
@@ -116,7 +109,7 @@ export default function BuyerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [wishlist, setWishlist] = useState(mockWishlist);
+  const [wishlist, setWishlist] = useState([]);
 
   // Deep-link support: /dashboard/buyer?tab=orders (used by the navbar's
   // Profile/Orders/Wishlist/Settings links).
@@ -174,6 +167,35 @@ export default function BuyerDashboard() {
       checkReviewEligibility(data);
     }
     setOrdersLoading(false);
+  }
+
+  async function loadWishlist(uid) {
+    const storageKey = `cheaper_wishlist_ids_${uid}`;
+    let ids = [];
+    try {
+      ids = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    } catch {
+      ids = [];
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      setWishlist([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, name, vendor_name, price, original_price, rating, reviews, images")
+      .in("id", ids);
+
+    if (error || !data) {
+      setWishlist([]);
+      return;
+    }
+
+    setWishlist(data);
+    const existingIds = data.map((product) => product.id);
+    localStorage.setItem(storageKey, JSON.stringify(existingIds));
   }
 
   function normStatus(s) { return s?.toLowerCase(); }
@@ -266,6 +288,7 @@ export default function BuyerDashboard() {
       setUser(user);
       setLoading(false);
       loadOrders(user.id);
+      loadWishlist(user.id);
     }
     checkAuth();
   }, [router]);
@@ -618,14 +641,14 @@ export default function BuyerDashboard() {
               ) : (
                 <div className="grid sm:grid-cols-2 gap-4">
                   {wishlist.map((item) => {
-                    const discount = pct(item.price, item.was);
+                    const discount = pct(item.price, item.original_price);
                     return (
                       <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-5 flex gap-4 shadow-sm hover:shadow-md hover:shadow-black/5 hover:border-gray-300 transition-all duration-300">
                         <div className="w-16 h-16 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
                           <Package size={20} className="text-gray-300" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[10px] text-gray-400 mb-0.5 font-medium truncate">{item.seller}</div>
+                          <div className="text-[10px] text-gray-400 mb-0.5 font-medium truncate">{item.vendor_name || "Seller information unavailable"}</div>
                           <div className="font-semibold text-sm text-black mb-1 leading-snug truncate">{item.name}</div>
                           <div className="flex items-center gap-1 mb-2">
                             <Star size={10} className="text-amber-500 fill-amber-500" />
@@ -634,8 +657,8 @@ export default function BuyerDashboard() {
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="flex items-baseline gap-1.5">
-                              <span className="font-bold text-black text-sm">${item.price.toFixed(2)}</span>
-                              {item.was && <span className="text-gray-300 text-xs line-through">${item.was.toFixed(2)}</span>}
+                              <span className="font-bold text-black text-sm">${Number(item.price).toFixed(2)}</span>
+                              {item.original_price && <span className="text-gray-300 text-xs line-through">${Number(item.original_price).toFixed(2)}</span>}
                               {discount && <span className="text-emerald-600 text-[10px] font-semibold">{discount}% off</span>}
                             </div>
                           </div>

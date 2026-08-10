@@ -127,8 +127,7 @@ export async function GET(request) {
   console.log("[auth/callback] Resolved existing role:", role, "profileRole:", profileRole);
 
   // New OAuth signup: the selected role is authoritative when no profile
-  // exists. This also handles providers/mock sessions that return default
-  // metadata such as "buyer" before the callback can persist our role.
+  // exists, before the callback persists that role.
   if (!profileRole && isSignup && (pendingRole === "buyer" || pendingRole === "vendor")) {
     try {
       console.log("[auth/callback] Applying selected signup role:", pendingRole);

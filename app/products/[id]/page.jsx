@@ -18,69 +18,32 @@ import { mergeVendorProfile } from "@/lib/vendor-display";
 import StarRating from "@/components/reviews/StarRating";
 import ReviewCard from "@/components/reviews/ReviewCard";
 
-const MOCK_PRODUCTS = {
-  "1": {
-    id: "1", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", sellerRating: 4.9, sellerSales: "12.4k",
-    price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics",
-    description: "Premium wireless earbuds with active noise cancellation, 30-hour battery life, and IPX5 water resistance. Crystal-clear audio with deep bass and crisp highs. Seamlessly pair with any Bluetooth 5.3 device.",
-    features: ["Active Noise Cancellation", "30-hour battery (10hr buds + 20hr case)", "IPX5 water resistant", "Bluetooth 5.3", "USB-C charging", "Touch controls"],
-    specs: { "Connectivity": "Bluetooth 5.3", "Battery": "10hr (buds) + 20hr (case)", "Water Rating": "IPX5", "Driver Size": "10mm", "Weight": "5g per earbud" },
-    vendor_id: "vendor-123",
-    seller_email: "techhub@example.com",
-    seller_phone: "+1 (555) 123-4567",
-    seller_location: "San Francisco, CA",
-    seller_verified: true,
-    seller_join_date: "2024",
-    seller_total_products: 156,
-    seller_response_time: "2-4 hours",
-    seller_about: "Premium electronics retailer with 5+ years of experience. We specialize in high-quality gadgets and accessories."
-  },
-  "2": {
-    id: "2", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", sellerRating: 4.9, sellerSales: "3.1k",
-    price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home",
-    description: "Handwoven 100% French linen throw blanket. Naturally breathable, hypoallergenic, and gets softer with every wash. Perfect for sofa draping or light bedding. Available in earthy, neutral tones.",
-    features: ["100% French linen", "Hypoallergenic", "Pre-washed & softened", "Machine washable", "140 × 200cm", "Ethically made"],
-    specs: { "Material": "100% French Linen", "Size": "140 × 200 cm", "Weight": "450g", "Care": "Machine wash 40°C", "Origin": "Portugal" },
-    vendor_id: "vendor-456",
-    seller_email: "cozynest@example.com",
-    seller_phone: "+1 (555) 987-6543",
-    seller_location: "Portland, OR",
-    seller_verified: true,
-    seller_join_date: "2023",
-    seller_total_products: 89,
-    seller_response_time: "1-3 hours",
-    seller_about: "We create beautiful home decor items that bring comfort and style to your space."
-  },
-};
-
-
-
 function normalizeProduct(raw) {
   if (!raw) return null;
   return {
     id: raw.id,
     name: raw.name,
-    vendor_name: raw.vendor_name || "Marketplace Seller",
-    vendor_id: raw.vendor_id || raw.vendorId || "unknown-vendor",
-    sellerRating: 4.8,
-    sellerSales: "—",
+    vendor_name: raw.vendor_name || "Seller information unavailable",
+    vendor_id: raw.vendor_id || raw.vendorId || null,
+    sellerRating: raw.seller_rating || 0,
+    sellerSales: raw.seller_sales || "—",
     price: parseFloat(raw.price),
     original_price: raw.original_price ? parseFloat(raw.original_price) : null,
     rating: raw.rating || 0,
     reviews: raw.reviews || 0,
     category: raw.category || "General",
-    description: raw.description || "No description provided.",
+    description: raw.description || "No description provided by the seller.",
     features: Array.isArray(raw.features) ? raw.features : [],
     specs: raw.specs && typeof raw.specs === "object" ? raw.specs : {},
     stock: raw.stock ?? 0,
-    seller_email: raw.seller_email || raw.sellerEmail || "seller@example.com",
-    seller_phone: raw.seller_phone || raw.sellerPhone || "+1 (555) 000-0000",
-    seller_location: raw.seller_location || raw.sellerLocation || "Location not specified",
+    seller_email: raw.seller_email || raw.sellerEmail || "",
+    seller_phone: raw.seller_phone || raw.sellerPhone || "",
+    seller_location: raw.seller_location || raw.sellerLocation || "",
     seller_verified: raw.seller_verified ?? raw.sellerVerified ?? false,
-    seller_join_date: raw.seller_join_date || raw.sellerJoinDate || "2024",
+    seller_join_date: raw.seller_join_date || raw.sellerJoinDate || "",
     seller_total_products: raw.seller_total_products || raw.sellerTotalProducts || 0,
-    seller_response_time: raw.seller_response_time || raw.sellerResponseTime || "24 hours",
-    seller_about: raw.seller_about || raw.sellerAbout || "Seller information not available.",
+    seller_response_time: raw.seller_response_time || raw.sellerResponseTime || "",
+    seller_about: raw.seller_about || raw.sellerAbout || "",
     images: Array.isArray(raw.images) ? raw.images : [],
   };
 }
@@ -91,11 +54,8 @@ export default function ProductPage({ params }) {
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
-  const [product, setProduct] = useState(() => {
-    const mock = MOCK_PRODUCTS[String(id)];
-    return mock ? normalizeProduct(mock) : null;
-  });
-  const [dbLoading, setDbLoading] = useState(!MOCK_PRODUCTS[String(id)]);
+  const [product, setProduct] = useState(null);
+  const [dbLoading, setDbLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
 
@@ -248,7 +208,6 @@ export default function ProductPage({ params }) {
   };
 
   useEffect(() => {
-    if (MOCK_PRODUCTS[String(id)]) return;
     async function fetchProduct() {
       setDbLoading(true);
       const { data, error } = await supabase
@@ -276,20 +235,6 @@ export default function ProductPage({ params }) {
   }, [id]);
 
   const fetchReviews = useCallback(async () => {
-    // Mock catalog IDs are intentionally non-UUID placeholders. Do not send
-    // them to the Supabase-backed reviews endpoint, which expects UUIDs.
-    const mockProduct = MOCK_PRODUCTS[String(id)];
-    if (mockProduct) {
-      setReviews([]);
-      setReviewStats({
-        average: mockProduct.rating || 0,
-        total: mockProduct.reviews || 0,
-        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-      });
-      setReviewsLoading(false);
-      return;
-    }
-
     try {
       const res = await fetch(`/api/reviews?product_id=${id}`);
       if (!res.ok) return;
@@ -844,31 +789,6 @@ export default function ProductPage({ params }) {
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Related products */}
-            <div className="bg-white border border-[#e2ddd6] rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-[#111] mb-4">You might also like</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.values(MOCK_PRODUCTS)
-                  .filter(p => String(p.id) !== String(id))
-                  .slice(0, 4)
-                  .map((related) => (
-                    <Link
-                      key={related.id}
-                      href={`/products/${related.id}`}
-                      className="border border-[#e2ddd6] rounded-xl overflow-hidden hover:border-[#999] transition-colors group"
-                    >
-                      <div className="h-20 bg-[#f5f3ef] flex items-center justify-center">
-                        <Package size={22} className="text-[#ddd]" />
-                      </div>
-                      <div className="p-2.5">
-                        <div className="text-xs font-semibold text-[#111] leading-snug mb-1 line-clamp-2">{related.name}</div>
-                        <div className="text-xs font-bold text-[#111]">${parseFloat(related.price).toFixed(2)}</div>
-                      </div>
-                    </Link>
-                  ))}
-              </div>
             </div>
 
           </div>

@@ -12,17 +12,6 @@ import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import { mergeVendorProfiles } from "@/lib/vendor-display";
 
-const MOCK_PRODUCTS = [
-  { id: "1", name: "Wireless Earbuds Pro", vendor_name: "TechHub Store", price: 29.99, original_price: 59.99, rating: 4.8, reviews: 342, category: "Electronics" },
-  { id: "2", name: "Linen Throw Blanket", vendor_name: "CozyNest Shop", price: 18.00, original_price: 36.00, rating: 4.9, reviews: 128, category: "Home" },
-  { id: "3", name: "Running Shoes X2", vendor_name: "SportZone", price: 44.99, original_price: 89.99, rating: 4.7, reviews: 215, category: "Sports" },
-  { id: "4", name: "Ceramic Mug Set (4)", vendor_name: "HomeGoods Co.", price: 12.50, original_price: 24.00, rating: 5.0, reviews: 87, category: "Home" },
-  { id: "5", name: "Standing Desk Pro", vendor_name: "WorkSpace Co.", price: 249.99, original_price: 349.99, rating: 4.7, reviews: 203, category: "Electronics" },
-  { id: "6", name: "Air Purifier HEPA", vendor_name: "CleanAir Shop", price: 89.00, original_price: 129.00, rating: 4.9, reviews: 87, category: "Home" },
-  { id: "7", name: "Leather Wallet Slim", vendor_name: "Craft & Co.", price: 34.00, original_price: 54.00, rating: 4.6, reviews: 145, category: "Fashion" },
-  { id: "8", name: "Smart Plug (4-pack)", vendor_name: "TechHub Store", price: 19.99, original_price: 29.99, rating: 4.8, reviews: 412, category: "Electronics" },
-];
-
 const CATEGORIES = [
   { label: "All", value: "" },
   { label: "Electronics", value: "Electronics", Icon: Monitor },
@@ -50,7 +39,7 @@ export default function MarketplacePage() {
   const { addItem, count, openCart } = useCart();
 
   const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState(MOCK_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [fromDb, setFromDb] = useState(false);
 
@@ -89,7 +78,7 @@ export default function MarketplacePage() {
 
     const { data, error } = await q;
 
-    if (!error && data && data.length > 0) {
+    if (!error) {
       const vendorIds = [...new Set(data.map((product) => product.vendor_id).filter(Boolean))];
       const { data: profiles } = vendorIds.length
         ? await supabase
@@ -110,16 +99,7 @@ export default function MarketplacePage() {
       setProducts(liveProducts);
     } else {
       setFromDb(false);
-      let filtered = [...MOCK_PRODUCTS];
-      if (search) filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.vendor_name.toLowerCase().includes(search.toLowerCase())
-      );
-      if (category) filtered = filtered.filter(p => p.category === category);
-      if (maxPrice < 500) filtered = filtered.filter(p => p.price <= maxPrice);
-      if (sort === "price_asc") filtered.sort((a, b) => a.price - b.price);
-      else if (sort === "price_desc") filtered.sort((a, b) => b.price - a.price);
-      setProducts(filtered);
+      setProducts([]);
     }
     setProductsLoading(false);
   }, [search, category, sort, maxPrice]);
@@ -289,7 +269,7 @@ export default function MarketplacePage() {
                 <div key={product.id} className="bg-white border border-[#e2ddd6] rounded-xl overflow-hidden hover:border-[#999] hover:shadow-md transition-all flex flex-col">
                   <div className="h-36 bg-[#f9f8f6] relative flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {(product.image || product.image_url || product.images?.[0]) ? (
-                      <img src={product.image || product.image_url || product.images?.[0] || '/products/rog-laptop.png'} alt={product.name} className="w-full h-full object-contain p-3" />
+                      <img src={product.image || product.image_url || product.images?.[0]} alt={product.name} className="w-full h-full object-contain p-3" />
                     ) : (
                       <Package size={30} className="text-[#ddd]" />
                     )}
