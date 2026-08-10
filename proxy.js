@@ -34,6 +34,7 @@ const ADMIN_ROUTES = [
   "/dashboard/admin",
   "/api/admin",
   "/admin",
+  "/cheaper-admin",
 ];
 
 function isAdminRoute(pathname) {
