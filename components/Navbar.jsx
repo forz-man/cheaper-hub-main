@@ -14,7 +14,7 @@ import useAuth from "@/hooks/useAuth";
 import useNotifications from "@/hooks/useNotifications";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
-import { dashboardTabHref } from "@/lib/auth";
+import { dashboardTabHref, normalizeRole, resolveUserRole } from "@/lib/auth";
 import { GrDashboard } from "react-icons/gr";
 import { getUserInitial } from "@/lib/utils";
 
@@ -81,12 +81,23 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { count: cartCount, openCart } = useCart();
-  const metadataRole = user?.user_metadata?.role || user?.app_metadata?.role || null;
   const [profileRole, setProfileRole] = useState(null);
   const [profile, setProfile] = useState(null);
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
   const displayInitial = getUserInitial(profile, user);
-  const userRole = profileRole || metadataRole;
+  const userRole = resolveUserRole(user, profileRole);
+  const profileHref =
+    userRole === "vendor"
+      ? "/vendor-profile"
+      : userRole === "buyer"
+        ? "/dashboard/buyer"
+        : "/dashboard";
+  const profileLabel =
+    userRole === "vendor"
+      ? "Vendor Profile"
+      : userRole === "buyer"
+        ? "Buyer Profile"
+        : "Profile";
   const isProtectedPath = !!(
     pathname?.startsWith("/dashboard") ||
     pathname === "/vendor-profile" ||
@@ -471,10 +482,12 @@ export default function Navbar() {
 
                           <div className="py-1">
                             {[
-                              { icon: GrDashboard, label: "Dashboard", href: "/dashboard" },
-                              { icon: User, label: "Vendor Profile", href: "/vendor-profile" },
-                              { icon: Heart, label: "Wishlist", href: "/wishlist" },
-                              { icon: ShoppingBag, label: "Orders", href: "/dashboard/orders" },
+                              { icon: GrDashboard, label: "Dashboard", href: dashboardTabHref(userRole) },
+                              { icon: User, label: profileLabel, href: profileHref },
+                              ...(userRole === "buyer"
+                                ? [{ icon: Heart, label: "Wishlist", href: dashboardTabHref(userRole, "wishlist") }]
+                                : []),
+                              { icon: ShoppingBag, label: "Orders", href: dashboardTabHref(userRole, "orders") },
                               { icon: Settings, label: "Settings", href: "/settings" },
                             ].map(({ icon: Icon, label, href, badge, action }) => {
                               const cls = "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-black w-full text-left";
