@@ -187,7 +187,10 @@ export default function BuyerProfilePage() {
         return;
       }
 
-      if (result.data) setProfile(result.data);
+      if (result.data) {
+        setProfile(result.data);
+        window.dispatchEvent(new CustomEvent("profile-updated", { detail: result.data }));
+      }
       setIsEditing(false);
       setSaveSuccess(true);
       window.setTimeout(() => setSaveSuccess(false), 4000);

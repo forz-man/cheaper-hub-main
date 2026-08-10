@@ -127,6 +127,18 @@ export default function Navbar() {
     loadProfile();
   }, [user]);
 
+  useEffect(() => {
+    const handleProfileUpdated = (event) => {
+      const updatedProfile = event.detail;
+      if (!updatedProfile) return;
+      setProfile((current) => ({ ...current, ...updatedProfile }));
+      if (updatedProfile.role) setProfileRole(updatedProfile.role);
+    };
+
+    window.addEventListener("profile-updated", handleProfileUpdated);
+    return () => window.removeEventListener("profile-updated", handleProfileUpdated);
+  }, []);
+
   const {
     items: notifItems,
     unreadMessages,
