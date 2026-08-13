@@ -55,6 +55,7 @@ export default function ProductPage({ params }) {
   const { user, loading: authLoading } = useAuth();
 
   const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
@@ -228,6 +229,27 @@ export default function ProductPage({ params }) {
               .maybeSingle()
           : { data: null };
         setProduct(mergeVendorProfile(normalizedProduct, vendorProfile));
+
+        if (data.category) {
+          const { data: relatedData } = await supabase
+            .from("products")
+            .select("id, name, price, original_price, images, category, vendor_name")
+            .eq("approval_status", "approved")
+            .eq("status", "active")
+            .eq("category", data.category)
+            .neq("id", id)
+            .order("created_at", { ascending: false })
+            .limit(4);
+
+          setRelatedProducts((relatedData || []).map((item) => ({
+            ...item,
+            images: Array.isArray(item.images) ? item.images : [],
+            price: Number(item.price),
+            original_price: item.original_price ? Number(item.original_price) : null,
+          })));
+        } else {
+          setRelatedProducts([]);
+        }
       }
       setDbLoading(false);
     }
@@ -790,6 +812,57 @@ export default function ProductPage({ params }) {
                 )}
               </button>
             </div>
+
+            {relatedProducts.length > 0 && (
+              <div className="bg-white border border-[#e2ddd6] rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-[#111]">Related items</h2>
+                  <Link
+                    href={`/marketplace?category=${encodeURIComponent(product.category)}`}
+                    className="text-[11px] font-semibold text-[#4648d4] hover:underline"
+                  >
+                    See more
+                  </Link>
+                </div>
+                <div className="space-y-3">
+                  {relatedProducts.map((related) => (
+                    <Link
+                      key={related.id}
+                      href={`/products/${related.id}`}
+                      className="flex items-center gap-3 group"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-[#f9f8f6] border border-[#f0ede8] flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {related.images[0] ? (
+                          <img
+                            src={related.images[0]}
+                            alt={related.name}
+                            className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <Package size={18} className="text-[#d8d5cf]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-[#111] truncate group-hover:underline">
+                          {related.name}
+                        </p>
+                        <p className="text-[10px] text-[#999] truncate mt-0.5">
+                          {related.vendor_name || "Seller information unavailable"}
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className="text-xs font-bold text-[#111]">${related.price.toFixed(2)}</span>
+                          {related.original_price && (
+                            <span className="text-[10px] text-[#bbb] line-through">
+                              ${related.original_price.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
