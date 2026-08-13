@@ -48,6 +48,46 @@ function normalizeProduct(raw) {
   };
 }
 
+const RELATED_STOP_WORDS = new Set([
+  "and", "the", "for", "with", "from", "new", "best", "sale",
+  "your", "this", "that", "pro", "plus", "edition", "model",
+]);
+
+function productTerms(value) {
+  return new Set(
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((term) => term.length > 1 && !RELATED_STOP_WORDS.has(term)),
+  );
+}
+
+function rankRelatedProducts(current, candidates) {
+  const currentNameTerms = productTerms(current.name);
+  const currentDescriptionTerms = productTerms(current.description);
+
+  return candidates
+    .map((candidate) => {
+      const candidateNameTerms = productTerms(candidate.name);
+      const candidateDescriptionTerms = productTerms(candidate.description);
+      const nameOverlap = [...currentNameTerms].filter((term) => candidateNameTerms.has(term)).length;
+      const descriptionOverlap = [...currentDescriptionTerms].filter((term) => candidateDescriptionTerms.has(term)).length;
+      const sameCategory = current.category && candidate.category === current.category;
+
+      return {
+        ...candidate,
+        relatedScore:
+          nameOverlap * 100 +
+          descriptionOverlap * 5 +
+          (sameCategory ? 10 : 0),
+      };
+    })
+    .sort((a, b) => b.relatedScore - a.relatedScore)
+    .slice(0, 4)
+    .map(({ relatedScore, ...candidate }) => candidate);
+}
+
 export default function ProductPage({ params }) {
   const { id } = use(params);
   const router = useRouter();
@@ -230,26 +270,22 @@ export default function ProductPage({ params }) {
           : { data: null };
         setProduct(mergeVendorProfile(normalizedProduct, vendorProfile));
 
-        if (data.category) {
-          const { data: relatedData } = await supabase
+        const { data: relatedData } = await supabase
             .from("products")
-            .select("id, name, price, original_price, images, category, vendor_name")
+            .select("id, name, description, price, original_price, images, category, vendor_name, created_at")
             .eq("approval_status", "approved")
             .eq("status", "active")
-            .eq("category", data.category)
             .neq("id", id)
             .order("created_at", { ascending: false })
-            .limit(4);
+            .limit(40);
 
-          setRelatedProducts((relatedData || []).map((item) => ({
-            ...item,
-            images: Array.isArray(item.images) ? item.images : [],
-            price: Number(item.price),
-            original_price: item.original_price ? Number(item.original_price) : null,
-          })));
-        } else {
-          setRelatedProducts([]);
-        }
+        const relatedCandidates = (relatedData || []).map((item) => ({
+          ...item,
+          images: Array.isArray(item.images) ? item.images : [],
+          price: Number(item.price),
+          original_price: item.original_price ? Number(item.original_price) : null,
+        }));
+        setRelatedProducts(rankRelatedProducts(normalizedProduct, relatedCandidates));
       }
       setDbLoading(false);
     }
