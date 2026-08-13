@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,7 +9,7 @@ import {
   LogOut, Plus, Upload, ArrowUpRight,
   TrendingUp, Eye, ChevronRight, Search, X,
   Trash2, Store, Loader2, AlertTriangle, Landmark, CheckCircle2, ExternalLink,
-  ImagePlus,
+  ImagePlus, FileSpreadsheet, Download,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
@@ -44,6 +44,149 @@ const NEXT_FULFILLMENT_ACTION = {
 const CATEGORIES = ["Electronics", "Fashion", "Home & Living", "Food & Bev", "Sports", "Books"];
 
 const emptyForm = { name: "", price: "", original_price: "", stock: "", category: "", description: "" };
+
+const CSV_HEADERS = [
+  "name",
+  "price",
+  "original_price",
+  "stock",
+  "category",
+  "description",
+  "images",
+];
+
+function normalizeCsvHeader(header) {
+  return header
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function parseCsv(text) {
+  const records = [];
+  let record = [];
+  let value = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"') {
+      if (quoted && next === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      record.push(value);
+      value = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") i += 1;
+      record.push(value);
+      if (record.some((cell) => cell.trim() !== "")) records.push(record);
+      record = [];
+      value = "";
+    } else {
+      value += char;
+    }
+  }
+
+  if (quoted) throw new Error("The CSV has an unclosed quoted value.");
+  if (value !== "" || record.length > 0) {
+    record.push(value);
+    if (record.some((cell) => cell.trim() !== "")) records.push(record);
+  }
+  return records;
+}
+
+function parseProductCsv(text) {
+  const records = parseCsv(text);
+  if (records.length < 2) {
+    return { rows: [], errors: ["Add a header row and at least one product row."] };
+  }
+
+  const headers = records[0].map(normalizeCsvHeader);
+  const headerAliases = {
+    product_name: "name",
+    title: "name",
+    sale_price: "price",
+    list_price: "original_price",
+    msrp: "original_price",
+    inventory: "stock",
+    quantity: "stock",
+    image: "images",
+    image_url: "images",
+    image_urls: "images",
+  };
+  const mappedHeaders = headers.map((header) => headerAliases[header] || header);
+  const errors = [];
+  const requiredHeaders = ["name", "price"];
+
+  requiredHeaders.forEach((header) => {
+    if (!mappedHeaders.includes(header)) errors.push(`Missing required column: ${header}`);
+  });
+  if (errors.length > 0) return { rows: [], errors };
+
+  const rows = [];
+  records.slice(1).forEach((record, index) => {
+    const line = index + 2;
+    const raw = Object.fromEntries(mappedHeaders.map((header, column) => [header, (record[column] || "").trim()]));
+    const name = raw.name;
+    const price = Number(raw.price);
+    const originalPrice = raw.original_price === "" ? null : Number(raw.original_price);
+    const stock = raw.stock === "" ? 0 : Number(raw.stock);
+    let rowValid = true;
+
+    if (!name) {
+      errors.push(`Row ${line}: name is required.`);
+      rowValid = false;
+    }
+    if (raw.price === "" || !Number.isFinite(price) || price < 0) {
+      errors.push(`Row ${line}: price must be a number greater than or equal to 0.`);
+      rowValid = false;
+    }
+    if (originalPrice !== null && (!Number.isFinite(originalPrice) || originalPrice < 0)) {
+      errors.push(`Row ${line}: original_price must be a number greater than or equal to 0.`);
+      rowValid = false;
+    }
+    if (!Number.isInteger(stock) || stock < 0) {
+      errors.push(`Row ${line}: stock must be a whole number greater than or equal to 0.`);
+      rowValid = false;
+    }
+
+    let images = [];
+    if (raw.images) {
+      try {
+        images = raw.images.startsWith("[")
+          ? JSON.parse(raw.images)
+          : raw.images.split(/[;|]/).map((url) => url.trim()).filter(Boolean);
+        if (!Array.isArray(images) || images.some((url) => typeof url !== "string")) throw new Error();
+      } catch {
+        errors.push(`Row ${line}: images must be separated by semicolons or be a JSON array.`);
+        images = [];
+        rowValid = false;
+      }
+    }
+
+    if (rowValid) {
+      rows.push({
+        line,
+        name,
+        price,
+        original_price: originalPrice,
+        stock,
+        category: raw.category || "General",
+        description: raw.description || null,
+        images,
+      });
+    }
+  });
+
+  return { rows, errors };
+}
 
 // ─── Animation variants ────────────────────────────────────────────────────────
 
@@ -145,6 +288,13 @@ export default function VendorDashboard() {
   const [saveError, setSaveError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [images, setImages] = useState([]); // [{ id, preview, url, uploading, error }]
+  const csvInputRef = useRef(null);
+  const [showCsvImport, setShowCsvImport] = useState(false);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [csvRows, setCsvRows] = useState([]);
+  const [csvErrors, setCsvErrors] = useState([]);
+  const [csvImportError, setCsvImportError] = useState(null);
+  const [csvImporting, setCsvImporting] = useState(false);
 
   async function loadProducts(u) {
     setProductsLoading(true);
@@ -343,6 +493,92 @@ export default function VendorDashboard() {
     setSaveError(null);
     setImages([]);
     setShowAddProduct(true);
+  };
+
+  const openCsvImport = () => {
+    setCsvFileName("");
+    setCsvRows([]);
+    setCsvErrors([]);
+    setCsvImportError(null);
+    setShowCsvImport(true);
+  };
+
+  const handleCsvSelect = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setCsvFileName(file.name);
+    setCsvImportError(null);
+    try {
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        throw new Error("Choose a .csv file.");
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("CSV files must be 5MB or smaller.");
+      }
+      const parsed = parseProductCsv(await file.text());
+      setCsvRows(parsed.rows);
+      setCsvErrors(parsed.errors);
+    } catch (error) {
+      setCsvRows([]);
+      setCsvErrors([error.message]);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const blob = new Blob([`${CSV_HEADERS.join(",")}\n`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cheaper-product-import-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvImport = async () => {
+    if (csvRows.length === 0 || !user?.id) return;
+    setCsvImporting(true);
+    setCsvImportError(null);
+
+    try {
+      const { data: vendorProfile } = await supabase
+        .from("profiles")
+        .select("store_name, full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const vendorName =
+        vendorProfile?.store_name ||
+        vendorProfile?.full_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "Seller";
+
+      const payload = csvRows.map((row) => ({
+        vendor_id: user.id,
+        vendor_name: vendorName,
+        name: row.name,
+        description: row.description,
+        category: row.category,
+        price: row.price,
+        original_price: row.original_price,
+        stock: row.stock,
+        status: row.stock === 0 ? "out_of_stock" : "active",
+        images: row.images,
+      }));
+      const { data, error } = await supabase.from("products").insert(payload).select();
+      if (error) throw error;
+
+      setProducts((prev) => [...(data || []), ...prev]);
+      setShowCsvImport(false);
+      setCsvRows([]);
+      setCsvErrors([]);
+      setCsvFileName("");
+    } catch (error) {
+      setCsvImportError(error.message || "The products could not be imported.");
+    } finally {
+      setCsvImporting(false);
+    }
   };
 
   const handleImageSelect = async (e) => {
@@ -582,10 +818,16 @@ export default function VendorDashboard() {
                 <p className="text-sm text-gray-400">
                   <span className="font-semibold text-black">{products.length}</span> {products.length === 1 ? "product" : "products"}
                 </p>
-                <motion.button onClick={openAddProduct} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
-                  <Plus size={16} /> Add product
-                </motion.button>
+                 <div className="flex items-center gap-2">
+                   <motion.button onClick={openCsvImport} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                     className="flex items-center gap-2 bg-white border border-gray-200 text-black px-4 py-2.5 rounded-xl text-sm font-semibold hover:border-gray-400 transition-all">
+                     <FileSpreadsheet size={16} /> Import CSV
+                   </motion.button>
+                   <motion.button onClick={openAddProduct} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                     className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
+                     <Plus size={16} /> Add product
+                   </motion.button>
+                 </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-2xl flex items-center mb-5 overflow-hidden shadow-sm hover:border-gray-400 focus-within:border-black focus-within:ring-2 focus-within:ring-black/5 transition-all">
@@ -1067,6 +1309,123 @@ export default function VendorDashboard() {
                 className="flex-1 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Import Products CSV Modal ── */}
+      {showCsvImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 flex-shrink-0">
+              <div>
+                <h2 className="font-bold text-black text-base" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+                  Import products from CSV
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">Products will be submitted for approval after import.</p>
+              </div>
+              <button onClick={() => setShowCsvImport(false)} className="text-gray-400 hover:text-black transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
+                <div className="flex items-start gap-3">
+                  <FileSpreadsheet size={18} className="text-gray-500 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-black">Choose a CSV file</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Required columns: <span className="font-medium text-gray-700">name, price</span>. Optional: original_price, stock, category, description, images.
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1">Use semicolons between multiple image URLs. Maximum file size: 5MB.</p>
+                    <div className="flex items-center gap-3 mt-3">
+                      <label className="inline-flex items-center gap-2 bg-black text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-800 transition-colors">
+                        <Upload size={13} />
+                        {csvFileName ? "Choose another file" : "Choose CSV"}
+                        <input ref={csvInputRef} type="file" accept=".csv,text/csv" onChange={handleCsvSelect} className="hidden" />
+                      </label>
+                      <button type="button" onClick={downloadCsvTemplate} className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-black transition-colors">
+                        <Download size={13} /> Download template
+                      </button>
+                    </div>
+                    {csvFileName && <p className="text-xs text-gray-500 mt-2 truncate">{csvFileName}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {csvErrors.length > 0 && (
+                <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+                  <p className="text-xs font-semibold text-red-700 mb-2">
+                    {csvErrors.length} validation {csvErrors.length === 1 ? "issue" : "issues"}
+                  </p>
+                  <ul className="space-y-1 max-h-28 overflow-y-auto">
+                    {csvErrors.map((error, index) => <li key={`${error}-${index}`} className="text-xs text-red-600">{error}</li>)}
+                  </ul>
+                  <p className="text-[11px] text-red-500 mt-2">Rows with errors will be skipped. Fix the CSV and upload it again to import every row.</p>
+                </div>
+              )}
+
+              {csvImportError && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700">
+                  {csvImportError}
+                </div>
+              )}
+
+              {csvRows.length > 0 ? (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-black">{csvRows.length} valid {csvRows.length === 1 ? "product" : "products"} ready</p>
+                    {csvErrors.length > 0 && <span className="text-[11px] text-amber-600">Some rows will be skipped</span>}
+                  </div>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="max-h-52 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-400">Row</th>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-400">Product</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-400">Price</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-400">Stock</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {csvRows.map((row) => (
+                            <tr key={row.line}>
+                              <td className="px-3 py-2 text-gray-400">{row.line}</td>
+                              <td className="px-3 py-2 text-black font-medium truncate max-w-[260px]">{row.name}</td>
+                              <td className="px-3 py-2 text-right text-gray-600">${row.price.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{row.stock}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-dashed border-gray-200 rounded-xl p-8 text-center">
+                  <FileSpreadsheet size={24} className="text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Upload a CSV to preview products here</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={() => setShowCsvImport(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold hover:border-gray-400 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCsvImport}
+                disabled={csvImporting || csvRows.length === 0}
+                className="flex-1 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {csvImporting ? <><Loader2 size={14} className="animate-spin" /> Importing…</> : `Import ${csvRows.length || ""} products`}
               </button>
             </div>
           </div>
