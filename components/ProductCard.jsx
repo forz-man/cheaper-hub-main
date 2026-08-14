@@ -10,8 +10,10 @@ import useAuth from "@/hooks/useAuth";
 import { requireAuth } from "@/lib/auth-flow";
 import StarRating from "@/components/reviews/StarRating";
 import { supabase } from "@/lib/supabase";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 const ProductCard = ({ product }) => {
+  const shouldReduceMotion = useReducedMotion();
   const { addItem, openCart } = useCart();
   const { user } = useAuth();
   const router = useRouter();
@@ -20,6 +22,20 @@ const ProductCard = ({ product }) => {
   const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [dbRating, setDbRating] = useState(null);
   const [dbReviewCount, setDbReviewCount] = useState(null);
+
+  const cardVariants = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 40, scale: 0.96 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        type: "spring",
+        damping: 18,
+        stiffness: 90
+      }
+    }
+  };
 
   useEffect(() => {
     if (!product?.id) return;
@@ -110,10 +126,15 @@ const ProductCard = ({ product }) => {
 
   return (
     <motion.div 
+      variants={cardVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.1 }}
       className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200 transition-all duration-500"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      whileHover={{ y: -8, boxShadow: "0 20px 60px rgba(0,0,0,0.08)" }}
+      whileHover={shouldReduceMotion ? {} : { y: -8, scale: 1.02, boxShadow: "0 20px 40px rgba(0,0,0,0.12)" }}
+      whileTap={{ scale: 0.97 }}
     >
       <div className="relative h-52 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center overflow-hidden">
         {(product.image || product.image_url || product.images?.[0]) ? (
@@ -121,14 +142,14 @@ const ProductCard = ({ product }) => {
             src={product.image || product.image_url || product.images?.[0]}
             alt={product.name}
             className="w-full h-full object-contain p-4"
-            animate={{ scale: isHovered ? 1.06 : 1 }}
+            animate={{ scale: isHovered && !shouldReduceMotion ? 1.08 : 1 }}
             transition={{ duration: 0.4 }}
           />
         ) : (
           <motion.div
             animate={{ 
-              scale: isHovered ? 1.1 : 1,
-              rotate: isHovered ? 3 : 0
+              scale: isHovered && !shouldReduceMotion ? 1.1 : 1,
+              rotate: isHovered && !shouldReduceMotion ? 3 : 0
             }}
             transition={{ duration: 0.4 }}
           >
@@ -172,15 +193,18 @@ const ProductCard = ({ product }) => {
 
         <motion.button
           onClick={handleWishlist}
-          className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-sm shadow-lg transition-all duration-300 z-10 ${
+          className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-sm shadow-lg transition-all duration-300 z-10 cursor-pointer ${
             isWishlisted 
               ? 'bg-red-500 text-white shadow-red-500/30' 
               : 'bg-white/90 text-gray-400 hover:bg-white hover:text-black shadow-black/10'
           }`}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.85 }}
-          animate={isWishlisted ? { scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.3 }}
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.8 }}
+          animate={isWishlisted ? { scale: [1, 1.35, 0.95, 1] } : { scale: 1 }}
+          transition={{ 
+            scale: { duration: 0.35, ease: "easeOut", type: "tween" },
+            default: { type: "spring", stiffness: 400, damping: 15 }
+          }}
         >
           <Heart size={17} fill={isWishlisted ? 'currentColor' : 'none'} />
         </motion.button>
@@ -234,19 +258,24 @@ const ProductCard = ({ product }) => {
         <div className="flex items-center gap-2">
           <motion.button 
             onClick={handleAddToCart}
-            className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
               isAddedToCart 
                 ? 'bg-green-600 text-white' 
                 : 'bg-black text-white hover:bg-gray-800'
             }`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={shouldReduceMotion ? {} : { scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 350, damping: 15 }}
           >
             {isAddedToCart ? (
-              <>
+              <motion.span
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className="flex items-center gap-1"
+              >
                 <span>✓</span>
                 Added
-              </>
+              </motion.span>
             ) : (
               <>
                 <ShoppingBag size={14} />
@@ -255,14 +284,20 @@ const ProductCard = ({ product }) => {
             )}
           </motion.button>
 
-          <Link
-            href={`/products/${product.id}`}
-            className="px-5 py-2.5 text-xs font-semibold text-black border border-gray-300 rounded-xl hover:border-black hover:bg-gray-50 transition-all duration-200 flex items-center gap-1.5 group"
+          <motion.div 
+            whileHover={shouldReduceMotion ? {} : { scale: 1.04 }} 
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 350, damping: 15 }}
           >
-            <Eye size={14} />
-            View
-            <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
-          </Link>
+            <Link
+              href={`/products/${product.id}`}
+              className="px-5 py-2.5 text-xs font-semibold text-black border border-gray-300 rounded-xl hover:border-black hover:bg-gray-50 transition-all duration-200 flex items-center gap-1.5 group block"
+            >
+              <Eye size={14} />
+              View
+              <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </motion.div>
         </div>
 
      

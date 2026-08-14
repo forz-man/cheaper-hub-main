@@ -3,6 +3,10 @@
 import CategoriesSection from "@/components/dashboard/Home/CategoriesSection";
 import FeaturedDeals from "@/components/dashboard/Home/FeaturedDeals";
 import HeroSection from "@/components/dashboard/Home/HeroSection";
+import TrustSection from "@/components/dashboard/Home/TrustSection";
+import HowItWorks from "@/components/dashboard/Home/HowItWorks";
+import SellSection from "@/components/dashboard/Home/SellSection";
+import CTASection from "@/components/dashboard/Home/CTASection";
 import { useState, useEffect } from "react";
 
 export default function HomePage() {
@@ -42,8 +46,12 @@ export default function HomePage() {
     <div className="bg-white text-black min-h-screen">
       <main>
         <HeroSection />
+        <TrustSection />
         <FeaturedDeals products={products} loading={loading} />
         <CategoriesSection />
+        <HowItWorks />
+        <SellSection />
+        <CTASection />
       </main>
     </div>
   );

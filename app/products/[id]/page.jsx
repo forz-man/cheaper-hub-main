@@ -17,6 +17,8 @@ import { requireAuth } from "@/lib/auth-flow";
 import { mergeVendorProfile } from "@/lib/vendor-display";
 import StarRating from "@/components/reviews/StarRating";
 import ReviewCard from "@/components/reviews/ReviewCard";
+import useReducedMotion from "@/hooks/useReducedMotion";
+import { motion } from "framer-motion";
 
 function normalizeProduct(raw) {
   if (!raw) return null;
@@ -49,6 +51,7 @@ function normalizeProduct(raw) {
 }
 
 export default function ProductPage({ params }) {
+  const shouldReduceMotion = useReducedMotion();
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -638,41 +641,56 @@ export default function ProductPage({ params }) {
               <div className="flex items-center gap-4 mb-4">
                 <span className="text-xs font-bold text-[#888] uppercase tracking-wide">QTY</span>
                 <div className="flex items-center border border-[#e2ddd6] rounded-lg overflow-hidden">
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setQty(q => Math.max(1, q - 1))}
-                    className="w-9 h-9 flex items-center justify-center text-[#888] hover:bg-[#f5f3ef] transition-colors"
+                    className="w-9 h-9 flex items-center justify-center text-[#888] hover:bg-[#f5f3ef] transition-colors cursor-pointer"
                   >
                     <Minus size={14} />
-                  </button>
-                  <span className="w-10 text-center text-sm font-semibold text-[#111]">{qty}</span>
-                  <button
+                  </motion.button>
+                  <motion.span 
+                    key={qty}
+                    initial={shouldReduceMotion ? {} : { scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="w-10 text-center text-sm font-semibold text-[#111] inline-block"
+                  >
+                    {qty}
+                  </motion.span>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setQty(q => q + 1)}
-                    className="w-9 h-9 flex items-center justify-center text-[#888] hover:bg-[#f5f3ef] transition-colors"
+                    className="w-9 h-9 flex items-center justify-center text-[#888] hover:bg-[#f5f3ef] transition-colors cursor-pointer"
                   >
                     <Plus size={14} />
-                  </button>
+                  </motion.button>
                 </div>
                 <span className="text-xs text-emerald-600 font-medium">In stock</span>
               </div>
 
               {/* CTAs */}
-              <button onClick={handleBuyNow} className="w-full bg-[#111] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#333] transition-colors flex items-center justify-center gap-2 mb-3">
+              <motion.button 
+                whileTap={{ scale: 0.97 }}
+                onClick={handleBuyNow} 
+                className="w-full bg-[#111] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#333] transition-colors flex items-center justify-center gap-2 mb-3 cursor-pointer"
+              >
                 <ShoppingBag size={16} />
                 Buy now · ${(product.price * qty).toFixed(2)}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={handleAddToCart}
-                className="w-full bg-white border border-[#e2ddd6] py-3.5 rounded-xl font-semibold text-sm text-[#555] hover:border-[#999] transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-white border border-[#e2ddd6] py-3.5 rounded-xl font-semibold text-sm text-[#555] hover:border-[#999] transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShoppingCart size={16} />
                 {addedToCart ? "Added!" : "Add to cart"}
-              </button>
+              </motion.button>
 
               {/* Contact Seller Button - Now navigates directly to Messages */}
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={handleContactSeller}
                 disabled={contactLoading}
-                className="w-full mt-3 bg-[#4648d4] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#3537b8] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-3 bg-[#4648d4] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#3537b8] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {contactLoading ? (
                   <>
@@ -685,19 +703,20 @@ export default function ProductPage({ params }) {
                     Contact Seller
                   </>
                 )}
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={handleToggleWishlist}
-                className={`w-full py-3.5 rounded-xl font-semibold text-sm border transition-all flex items-center justify-center gap-2 mt-2 ${
+                className={`w-full py-3.5 rounded-xl font-semibold text-sm border transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer ${
                   wishlisted
-                    ? "bg-red-50 border-red-200 text-red-600"
+                    ? "bg-red-50 border-red-200 text-red-600 shadow-sm"
                     : "bg-white border-[#e2ddd6] text-[#555] hover:border-[#999]"
                 }`}
               >
-                <Heart size={16} className={wishlisted ? "fill-red-500" : ""} />
+                <Heart size={16} className={wishlisted ? "fill-red-500 text-red-500" : ""} />
                 {wishlisted ? "Saved to wishlist" : "Add to wishlist"}
-              </button>
+              </motion.button>
 
               {/* Trust badges */}
               <div className="grid grid-cols-3 gap-2 mt-5 pt-5 border-t border-[#f0ede8]">

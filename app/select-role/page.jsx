@@ -6,8 +6,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import AuthShell from "@/components/auth/AuthShell";
 import { supabase } from "@/lib/supabase";
+import useReducedMotion from "@/hooks/useReducedMotion";
+import { motion } from "framer-motion";
 
 function SelectRoleContent() {
+  const shouldReduceMotion = useReducedMotion();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromOAuth = searchParams.get("from") === "oauth";
@@ -59,11 +62,13 @@ function SelectRoleContent() {
 
         <div className="space-y-4">
           {/* Buyer Card */}
-          <button
+          <motion.button
             type="button"
             onClick={() => handleSelect("buyer")}
             disabled={!!loading}
-            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#4648d4] hover:shadow-lg hover:shadow-[#4648d4]/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
+            whileHover={shouldReduceMotion ? {} : { scale: 1.015, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#4648d4] hover:shadow-lg hover:shadow-[#4648d4]/10 disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
           >
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#4648d4]/10 flex items-center justify-center text-2xl flex-shrink-0">
@@ -89,14 +94,16 @@ function SelectRoleContent() {
                 </li>
               ))}
             </ul>
-          </button>
+          </motion.button>
 
           {/* Vendor Card */}
-          <button
+          <motion.button
             type="button"
             onClick={() => handleSelect("vendor")}
             disabled={!!loading}
-            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#131b2e] hover:shadow-lg hover:shadow-black/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
+            whileHover={shouldReduceMotion ? {} : { scale: 1.015, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#131b2e] hover:shadow-lg hover:shadow-black/10 disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
           >
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#131b2e]/10 flex items-center justify-center text-2xl flex-shrink-0">
@@ -122,7 +129,7 @@ function SelectRoleContent() {
                 </li>
               ))}
             </ul>
-          </button>
+          </motion.button>
         </div>
 
         {error && (

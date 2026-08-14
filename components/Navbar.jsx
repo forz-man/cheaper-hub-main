@@ -17,6 +17,8 @@ import { useCart } from "@/lib/cart-context";
 import { dashboardTabHref, normalizeRole, resolveUserRole } from "@/lib/auth";
 import { GrDashboard } from "react-icons/gr";
 import { getUserInitial } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 function formatNotifTime(iso) {
   if (!iso) return "";
@@ -67,6 +69,7 @@ function ChevronDownIcon({ size = 20, className = "" }) {
 }
 
 export default function Navbar() {
+  const shouldReduceMotion = useReducedMotion();
   const { user: authUser, loading: authLoading } = useAuth();
   const [user, setUser] = useState(null);
 
@@ -160,6 +163,8 @@ export default function Navbar() {
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -242,12 +247,15 @@ export default function Navbar() {
 
   return (
     <>
-      <header
+      <motion.header
         className={`fixed top-0 left-0 right-0 w-full z-50 transition-colors duration-300 ${
           scrolled
             ? 'bg-white shadow-lg border-b border-gray-200'
             : 'bg-white border-b border-gray-100'
         }`}
+        initial={shouldReduceMotion ? { y: 0, opacity: 1 } : { y: -64, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
       >
         <div className="container">
           <div className="flex items-center justify-between h-14 sm:h-16 md:h-[72px]">
@@ -273,45 +281,67 @@ export default function Navbar() {
   
             <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 ml-2 xl:ml-4">
               {navLinks.map(({ label, href, id, icon: Icon }) => (
-                <Link
+                <motion.div
                   key={id}
-                  href={href}
-                  className={`relative px-2 xl:px-3 py-1.5 xl:py-2 text-xs xl:text-sm rounded-lg whitespace-nowrap ${
-                    isActive(href)
-                      ? 'text-black bg-gray-100 font-semibold'
-                      : 'text-gray-500 hover:text-black hover:bg-gray-50 font-medium'
-                  }`}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <span className="flex items-center gap-1 xl:gap-1.5">
-                    <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
-                    <span className="hidden xl:inline">{label}</span>
-                  </span>
-                  {isActive(href) && (
-                    <span className="absolute bottom-0 left-1/2 w-4 xl:w-6 h-0.5 bg-black -translate-x-1/2"></span>
-                  )}
-                </Link>
+                  <Link
+                    href={href}
+                    className={`relative px-2 xl:px-3 py-1.5 xl:py-2 text-xs xl:text-sm rounded-lg whitespace-nowrap block ${
+                      isActive(href)
+                        ? 'text-black bg-gray-100 font-semibold'
+                        : 'text-gray-500 hover:text-black hover:bg-gray-50 font-medium'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1 xl:gap-1.5">
+                      <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
+                      <span className="hidden xl:inline">{label}</span>
+                    </span>
+                    {isActive(href) && (
+                      <motion.span
+                        layoutId="activeNavUnderline"
+                        className="absolute bottom-0 left-1/2 w-4 xl:w-6 h-0.5 bg-black -translate-x-1/2"
+                        transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                      />
+                    )}
+                  </Link>
+                </motion.div>
               ))}
             </nav>
 
       
             <div className="hidden xl:flex flex-1 max-w-xs 2xl:max-w-sm mx-4">
               <form onSubmit={handleSearch} className="w-full">
-                <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                <motion.div 
+                  className="relative flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-black focus-within:ring-1 focus-within:ring-black"
+                  animate={{
+                    scale: searchFocused ? 1.015 : 1,
+                    boxShadow: searchFocused ? "0 4px 20px rgba(0, 0, 0, 0.05)" : "none"
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                >
                   <Search size={16} className="ml-3 text-gray-400 flex-shrink-0" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
                     className="flex-1 bg-transparent outline-none text-sm py-2 px-2 text-black placeholder:text-gray-400 min-w-[80px]"
                     placeholder="Search products..."
                   />
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
                     type="submit"
-                    className="mr-1 px-3 py-1 bg-black text-white text-xs font-medium rounded-full hover:bg-gray-800 flex-shrink-0"
+                    className="mr-1 px-3 py-1 bg-black text-white text-xs font-medium rounded-full hover:bg-gray-800 flex-shrink-0 cursor-pointer"
                   >
                     Search
-                  </button>
-                </div>
+                  </motion.button>
+                </motion.div>
               </form>
             </div>
 
@@ -344,27 +374,34 @@ export default function Navbar() {
                       )}
                     </button>
 
-                    {showNotifDropdown && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowNotifDropdown(false)}></div>
-                        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden">
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
-                          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                            <p className="text-sm font-semibold text-black">Notifications</p>
-                            {notifItems.length > 0 && (
-                              <button onClick={markAllSeen} className="text-[11px] font-medium text-gray-400 hover:text-black">
-                                Mark all read
-                              </button>
-                            )}
-                          </div>
-                          <div className="max-h-96 overflow-y-auto">
-                            {notifItems.length === 0 ? (
-                              <div className="px-4 py-10 text-center">
-                                <Bell size={22} className="text-gray-300 mx-auto mb-2" />
-                                <p className="text-xs text-gray-400">You&apos;re all caught up</p>
-                              </div>
-                            ) : (
-                              notifItems.slice(0, 5).map((item) => {
+                    <AnimatePresence>
+                      {showNotifDropdown && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowNotifDropdown(false)}></div>
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden"
+                          >
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
+                            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                              <p className="text-sm font-semibold text-black">Notifications</p>
+                              {notifItems.length > 0 && (
+                                <button onClick={markAllSeen} className="text-[11px] font-medium text-gray-400 hover:text-black">
+                                  Mark all read
+                                </button>
+                              )}
+                            </div>
+                            <div className="max-h-96 overflow-y-auto">
+                              {notifItems.length === 0 ? (
+                                <div className="px-4 py-10 text-center">
+                                  <Bell size={22} className="text-gray-300 mx-auto mb-2" />
+                                  <p className="text-xs text-gray-400">You&apos;re all caught up</p>
+                                </div>
+                              ) : (
+                                notifItems.slice(0, 5).map((item) => {
                                 const Icon = item.type === "message" ? MessageCircle : item.type === "payout" || item.type === "payout_release" ? AwardIcon : item.type === "product_pending" ? AlertCircle : item.type === "product_approved" ? CheckCircle2 : item.type === "product_rejected" ? XCircle : Package;
                                 const isProductType = ["product_pending", "product_approved", "product_rejected"].includes(item.type);
                                 const iconBg = item.unread && isProductType
@@ -396,56 +433,83 @@ export default function Navbar() {
                                   </button>
                                 );
                               })
-                            )}
-                          </div>
-                          <Link
-                            href="/notifications"
-                            onClick={() => setShowNotifDropdown(false)}
-                            className="block text-center text-xs font-semibold text-black py-2.5 border-t border-gray-100 hover:bg-gray-50"
-                          >
-                            View all
-                          </Link>
-                        </div>
-                      </>
-                    )}
+                              )}
+                            </div>
+                            <Link
+                              href="/notifications"
+                              onClick={() => setShowNotifDropdown(false)}
+                              className="block text-center text-xs font-semibold text-black py-2.5 border-t border-gray-100 hover:bg-gray-50"
+                            >
+                              View all
+                            </Link>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
                   </div>
 
               
                   {userRole !== "vendor" && userRole !== "admin" && (
-                    <Link href={dashboardTabHref(userRole, "wishlist")} className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex">
-                      <div className="relative">
-                        <Heart size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
-                        {wishlistCount > 0 && (
-                          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-red-500 text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                            {wishlistCount > 9 ? '9+' : wishlistCount}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Link href={dashboardTabHref(userRole, "wishlist")} className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex block">
+                        <div className="relative">
+                          <Heart size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+                          {wishlistCount > 0 && (
+                            <motion.span 
+                              key={wishlistCount}
+                              initial={{ scale: 0.5, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                              className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-red-500 text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none"
+                            >
+                              {wishlistCount > 9 ? '9+' : wishlistCount}
+                            </motion.span>
+                          )}
+                        </div>
+                      </Link>
+                    </motion.div>
                   )}
 
-                  <button onClick={openCart} className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100">
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }} 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={openCart} 
+                    className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 cursor-pointer"
+                  >
                     <div className="relative">
                       <ShoppingCart size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
                       {cartCount > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-black text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                        <motion.span 
+                          key={cartCount}
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                          className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-black text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none"
+                        >
                           {cartCount > 9 ? '9+' : cartCount}
-                        </span>
+                        </motion.span>
                       )}
                     </div>
-                  </button>
+                  </motion.button>
 
-                 
-                  <Link href="/messages" className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex">
-                    <div className="relative">
-                      <MessageCircle size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
-                      {unreadMessages > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-black text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                          {unreadMessages > 9 ? '9+' : unreadMessages}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
+                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                    <Link href="/messages" className="relative p-1.5 sm:p-2 rounded-full hover:bg-gray-100 hidden sm:flex block">
+                      <div className="relative">
+                        <MessageCircle size={20} className="text-gray-600 sm:w-5 sm:h-5 md:w-[22px] md:h-[22px]" />
+                        {unreadMessages > 0 && (
+                          <motion.span 
+                            key={unreadMessages}
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                            className="absolute -top-1 -right-1 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] bg-black text-white text-[7px] sm:text-[8px] md:text-[9px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none"
+                          >
+                            {unreadMessages > 9 ? '9+' : unreadMessages}
+                          </motion.span>
+                        )}
+                      </div>
+                    </Link>
+                  </motion.div>
 
          
                   <div className="relative" ref={dropdownRef}>
@@ -461,78 +525,86 @@ export default function Navbar() {
                     </button>
 
           
-                    {showDropdown && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)}></div>
-                        <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden">
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
-
-                          <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-100">
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-black text-white flex items-center justify-center border border-gray-200">
-                                {avatarUrl ? (
-                                  <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover rounded-full" />
-                                ) : (
-                                  <span>{displayInitial}</span>
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs sm:text-sm font-semibold text-black truncate">
-                                  {profile?.full_name || profile?.fullName || user?.user_metadata?.full_name || "User"}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[150px]">
-                                  {profile?.email || user?.email}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="mt-1.5 sm:mt-2 flex items-center gap-1">
-                              <AwardIcon size={10} className="text-yellow-500" />
-                              <span className="text-[8px] sm:text-[10px] font-semibold text-yellow-600 bg-yellow-50 px-1.5 sm:px-2 py-0.5 rounded-full">
-                                Premium
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="py-1">
-                            {[
-                              { icon: GrDashboard, label: "Dashboard", href: dashboardTabHref(userRole) },
-                              { icon: User, label: profileLabel, href: profileHref },
-                              ...(userRole === "buyer"
-                                ? [{ icon: Heart, label: "Wishlist", href: dashboardTabHref(userRole, "wishlist") }]
-                                : []),
-                              { icon: ShoppingBag, label: "Orders", href: dashboardTabHref(userRole, "orders") },
-                              { icon: Settings, label: "Settings", href: "/settings" },
-                            ].map(({ icon: Icon, label, href, badge, action }) => {
-                              const cls = "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-black w-full text-left";
-                              const inner = (
-                                <>
-                                  <Icon size={14} className="text-gray-400" />
-                                  <span>{label}</span>
-                                  {badge && badge > 0 && (
-                                    <span className="ml-auto bg-black text-white text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full">
-                                      {badge}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                              return action ? (
-                                <button key={label} onClick={action} className={cls}>{inner}</button>
-                              ) : (
-                                <Link key={label} href={href} className={cls} onClick={() => setShowDropdown(false)}>{inner}</Link>
-                              );
-                            })}
-                          </div>
-
-                          <button
-                            onClick={handleSignOut}
-                            className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 mt-1"
+                    <AnimatePresence>
+                      {showDropdown && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)}></div>
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            className="absolute right-0 mt-2 w-56 sm:w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden"
                           >
-                            <LogOut size={14} className="text-red-400" />
-                            <span>Sign Out</span>
-                          </button>
-                        </div>
-                      </>
-                    )}
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
+
+                            <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-100">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-black text-white flex items-center justify-center border border-gray-200">
+                                  {avatarUrl ? (
+                                    <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover rounded-full" />
+                                  ) : (
+                                    <span>{displayInitial}</span>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs sm:text-sm font-semibold text-black truncate">
+                                    {profile?.full_name || profile?.fullName || user?.user_metadata?.full_name || "User"}
+                                  </p>
+                                  <p className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[150px]">
+                                    {profile?.email || user?.email}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-1.5 sm:mt-2 flex items-center gap-1">
+                                <AwardIcon size={10} className="text-yellow-500" />
+                                <span className="text-[8px] sm:text-[10px] font-semibold text-yellow-600 bg-yellow-50 px-1.5 sm:px-2 py-0.5 rounded-full">
+                                  Premium
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="py-1">
+                              {[
+                                { icon: GrDashboard, label: "Dashboard", href: dashboardTabHref(userRole) },
+                                { icon: User, label: profileLabel, href: profileHref },
+                                ...(userRole === "buyer"
+                                  ? [{ icon: Heart, label: "Wishlist", href: dashboardTabHref(userRole, "wishlist") }]
+                                  : []),
+                                { icon: ShoppingBag, label: "Orders", href: dashboardTabHref(userRole, "orders") },
+                                { icon: Settings, label: "Settings", href: "/settings" },
+                              ].map(({ icon: Icon, label, href, badge, action }) => {
+                                const cls = "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-black w-full text-left";
+                                const inner = (
+                                  <>
+                                    <Icon size={14} className="text-gray-400" />
+                                    <span>{label}</span>
+                                    {badge && badge > 0 && (
+                                      <span className="ml-auto bg-black text-white text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full">
+                                        {badge}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                                return action ? (
+                                  <button key={label} onClick={action} className={cls}>{inner}</button>
+                                ) : (
+                                  <Link key={label} href={href} className={cls} onClick={() => setShowDropdown(false)}>{inner}</Link>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              onClick={handleSignOut}
+                              className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 mt-1 cursor-pointer"
+                            >
+                              <LogOut size={14} className="text-red-400" />
+                              <span>Sign Out</span>
+                            </button>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </>
               ) : (
@@ -547,7 +619,8 @@ export default function Navbar() {
               )}
 
           
-              <button
+              <motion.button
+                whileTap={{ scale: 0.9 }}
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="lg:hidden p-1.5 sm:p-2 rounded-full hover:bg-gray-100 relative"
               >
@@ -561,129 +634,178 @@ export default function Navbar() {
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-500 rounded-full"></span>
                   )}
                 </div>
-              </button>
+              </motion.button>
             </div>
           </div>
 
       
-          {showSearch && (
-            <div className="lg:hidden py-2 border-t border-gray-100">
-              <form onSubmit={handleSearch} className="relative">
-                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-black focus-within:ring-1 focus-within:ring-black">
-                  <Search size={16} className="ml-3 text-gray-400 flex-shrink-0" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 bg-transparent outline-none text-sm py-2.5 px-2 text-black placeholder:text-gray-400 min-w-[60px]"
-                    placeholder="Search products..."
-                    autoFocus
-                  />
-                  <button 
-                    type="submit"
-                    className="mr-1 px-3 py-1.5 bg-black text-white text-xs font-medium rounded-full hover:bg-gray-800 flex-shrink-0"
+          <AnimatePresence>
+            {showSearch && (
+              <motion.div
+                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="lg:hidden py-2 border-t border-gray-100"
+              >
+                <form onSubmit={handleSearch} className="relative">
+                  <motion.div
+                    animate={{
+                      scale: mobileSearchFocused ? 1.025 : 1,
+                      boxShadow: mobileSearchFocused ? "0 4px 16px rgba(0, 0, 0, 0.06)" : "none"
+                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-black focus-within:ring-1 focus-within:ring-black"
                   >
-                    Go
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+                    <Search size={16} className="ml-3 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setMobileSearchFocused(true)}
+                      onBlur={() => setMobileSearchFocused(false)}
+                      className="flex-1 bg-transparent outline-none text-sm py-2.5 px-2 text-black placeholder:text-gray-400 min-w-[60px]"
+                      placeholder="Search products..."
+                      autoFocus
+                    />
+                    <motion.button 
+                      whileTap={{ scale: 0.92 }}
+                      type="submit"
+                      className="mr-1 px-3 py-1.5 bg-black text-white text-xs font-medium rounded-full hover:bg-gray-800 flex-shrink-0"
+                    >
+                      Go
+                    </motion.button>
+                  </motion.div>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
     
-          {isMobileMenuOpen && (
-            <div className="lg:hidden fixed inset-0 top-[56px] sm:top-[64px] md:top-[72px] z-40 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}>
-              <div 
-                className="absolute right-0 top-0 w-full max-w-sm h-full bg-white overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-                ref={mobileMenuRef}
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="lg:hidden fixed inset-0 top-[56px] sm:top-[64px] md:top-[72px] z-40 bg-black/50" 
+                onClick={() => setIsMobileMenuOpen(false)}
               >
-                <div className="py-3 px-3 space-y-1">
-                  <div className="grid grid-cols-2 gap-1">
-                    {navLinks.map(({ label, href, id, icon: Icon }) => (
-                      <Link
-                        key={id}
-                        href={href}
-                        className={`flex items-center gap-2 px-3 py-2.5 text-xs ${
-                          isActive(href)
-                            ? 'text-black bg-gray-100 font-semibold'
-                            : 'text-gray-600 hover:text-black hover:bg-gray-50 font-medium'
-                        } rounded-lg`}
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                        }}
-                      >
-                        <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
-                        {label}
-                      </Link>
-                    ))}
-                  </div>
-
-                 
-                  {showAuthControls && (
-                    <div className="border-t border-gray-200 mt-2 pt-2">
-                      <div className="grid grid-cols-4 gap-1">
-                        <Link
-                          href={dashboardTabHref(userRole, "wishlist")}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className={`flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 ${userRole === "vendor" || userRole === "admin" ? "hidden" : ""}`}
+                <motion.div 
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  className="absolute right-0 top-0 w-full max-w-sm h-full bg-white overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                  ref={mobileMenuRef}
+                >
+                  <div className="py-3 px-3 space-y-1">
+                    <div className="grid grid-cols-2 gap-1">
+                      {navLinks.map(({ label, href, id, icon: Icon }) => (
+                        <motion.div
+                          key={id}
+                          whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
                         >
-                          <Heart size={20} className="text-gray-600" />
-                          <span className="text-[8px] text-gray-400">Wishlist</span>
+                          <Link
+                            href={href}
+                            className={`flex items-center gap-2 px-3 py-2.5 text-xs ${
+                              isActive(href)
+                                ? 'text-black bg-gray-100 font-semibold'
+                                : 'text-gray-600 hover:text-black hover:bg-gray-50 font-medium'
+                            } rounded-lg`}
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                            }}
+                          >
+                            <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
+                            {label}
+                          </Link>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                   
+                    {showAuthControls && (
+                      <div className="border-t border-gray-200 mt-2 pt-2">
+                        <div className="grid grid-cols-4 gap-1">
+                          <motion.div whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}>
+                            <Link
+                              href={dashboardTabHref(userRole, "wishlist")}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              className={`flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 w-full ${userRole === "vendor" || userRole === "admin" ? "hidden" : ""}`}
+                            >
+                              <Heart size={20} className="text-gray-600" />
+                              <span className="text-[8px] text-gray-400">Wishlist</span>
+                            </Link>
+                          </motion.div>
+                          <motion.div whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); openCart(); }} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative w-full">
+                              <ShoppingCart size={20} className="text-gray-600" />
+                              {cartCount > 0 && (
+                                <motion.span
+                                  key={cartCount}
+                                  initial={shouldReduceMotion ? { scale: 1, opacity: 1 } : { scale: 0.5, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                                  className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1"
+                                >
+                                  {cartCount}
+                                </motion.span>
+                              )}
+                              <span className="text-[8px] text-gray-400">Cart</span>
+                            </button>
+                          </motion.div>
+                          <motion.div whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}>
+                            <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative w-full">
+                              <MessageCircle size={20} className="text-gray-600" />
+                              {unreadMessages > 0 && (
+                                <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
+                                  {unreadMessages}
+                                </span>
+                              )}
+                              <span className="text-[8px] text-gray-400">Messages</span>
+                            </Link>
+                          </motion.div>
+                          <motion.div whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}>
+                            <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative w-full">
+                              <Bell size={20} className="text-gray-600" />
+                              {notifUnreadCount > 0 && (
+                                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                              )}
+                              <span className="text-[8px] text-gray-400">Alerts</span>
+                            </Link>
+                          </motion.div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!showAuthControls && (
+                      <div className="pt-2 space-y-2 border-t border-gray-200 mt-2">
+                        <Link
+                          href="/login"
+                          className="block px-3 py-2.5 text-xs font-medium text-center text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Sign in
                         </Link>
-                        <button onClick={() => { setIsMobileMenuOpen(false); openCart(); }} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                          <ShoppingCart size={20} className="text-gray-600" />
-                          {cartCount > 0 && (
-                            <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-                              {cartCount}
-                            </span>
-                          )}
-                          <span className="text-[8px] text-gray-400">Cart</span>
-                        </button>
-                        <Link href="/messages" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                          <MessageCircle size={20} className="text-gray-600" />
-                          {unreadMessages > 0 && (
-                            <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] bg-black text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-                              {unreadMessages}
-                            </span>
-                          )}
-                          <span className="text-[8px] text-gray-400">Messages</span>
-                        </Link>
-                        <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-col items-center gap-0.5 py-2 rounded-lg hover:bg-gray-50 relative">
-                          <Bell size={20} className="text-gray-600" />
-                          {notifUnreadCount > 0 && (
-                            <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                          )}
-                          <span className="text-[8px] text-gray-400">Alerts</span>
+                        <Link
+                          href="/select-role"
+                          className="block px-3 py-2.5 text-xs font-semibold text-center text-white bg-black rounded-lg hover:bg-gray-800"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Get started
                         </Link>
                       </div>
-                    </div>
-                  )}
-
-                  {!showAuthControls && (
-                    <div className="pt-2 space-y-2 border-t border-gray-200 mt-2">
-                      <Link
-                        href="/login"
-                        className="block px-3 py-2.5 text-xs font-medium text-center text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Sign in
-                      </Link>
-                      <Link
-                        href="/select-role"
-                        className="block px-3 py-2.5 text-xs font-semibold text-center text-white bg-black rounded-lg hover:bg-gray-800"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Get started
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </header>
+      </motion.header>
     </>
   );
 }

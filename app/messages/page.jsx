@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import useAuth from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ function Avatar({ name = "?", size = 9 }) {
 // ─── Inner component (needs useSearchParams) ───────────────────────────────────
 
 function MessagesPageInner() {
+  const shouldReduceMotion = useReducedMotion();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -361,10 +363,11 @@ function MessagesPageInner() {
                       const isActive = selectedConv?.id === conv.id;
                       const hasUnread = conv.unread_count > 0;
                       return (
-                        <button
+                        <motion.button
                           key={conv.id}
+                          whileTap={{ scale: 0.985 }}
                           onClick={() => selectConv(conv)}
-                          className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors border-b border-gray-50 last:border-0 ${
+                          className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors border-b border-gray-50 last:border-0 cursor-pointer ${
                             isActive ? "bg-gray-50" : "hover:bg-gray-50/70"
                           }`}
                         >
@@ -402,7 +405,7 @@ function MessagesPageInner() {
                           ) : isActive ? (
                             <div className="w-1.5 h-1.5 rounded-full bg-black mt-2 flex-shrink-0" />
                           ) : null}
-                        </button>
+                        </motion.button>
                       );
                     })
                   )}
@@ -411,8 +414,16 @@ function MessagesPageInner() {
             )}
 
             {/* ── Chat panel ───────────────────────────────────────────────── */}
-            {(!isMobile || !showList) && (
-              <div className="flex-1 flex flex-col min-w-0 bg-white">
+            <AnimatePresence mode="wait">
+              {(!isMobile || !showList) && (
+                <motion.div
+                  key={selectedConv?.id || "empty"}
+                  initial={shouldReduceMotion ? {} : { opacity: 0, x: isMobile ? 80 : 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={shouldReduceMotion ? {} : { opacity: 0, x: isMobile ? 80 : -15 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="flex-1 flex flex-col min-w-0 bg-white"
+                >
                 {selectedConv ? (
                   <>
                     {/* Chat header */}
@@ -544,8 +555,9 @@ function MessagesPageInner() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </div>
         </div>

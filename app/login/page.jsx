@@ -9,8 +9,11 @@ import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import { login } from "@/lib/auth";
 import useAuth from "@/hooks/useAuth";
 import { getAuthIntent, normalizeReturnTo } from "@/lib/auth-flow";
+import useReducedMotion from "@/hooks/useReducedMotion";
+import { motion } from "framer-motion";
 
 function LoginForm() {
+  const shouldReduceMotion = useReducedMotion();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
@@ -94,33 +97,38 @@ function LoginForm() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
+          <motion.input
             type="email"
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            className="w-full h-12 rounded-xl border border-gray-200 px-4 outline-none focus:border-gray-950"
+            whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="w-full h-12 rounded-xl border border-gray-200 px-4 outline-none focus:border-gray-950 transition-colors"
           />
 
           <div className="relative">
-            <input
+            <motion.input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full h-12 rounded-xl border border-gray-200 px-4 pr-16 outline-none focus:border-gray-950"
+              whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="w-full h-12 rounded-xl border border-gray-200 px-4 pr-16 outline-none focus:border-gray-950 transition-colors"
             />
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 cursor-pointer"
             >
               {showPassword ? "Hide" : "Show"}
-            </button>
+            </motion.button>
           </div>
 
           <div className="flex items-center justify-between text-sm">
@@ -133,13 +141,14 @@ function LoginForm() {
             </Link>
           </div>
 
-          <button
+          <motion.button
             type="submit"
             disabled={loading}
-            className="w-full h-12 rounded-xl bg-gray-950 text-white font-semibold hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
+            whileTap={{ scale: 0.97 }}
+            className="w-full h-12 rounded-xl bg-gray-950 text-white font-semibold hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {loading ? "Signing in..." : "Sign In"}
-          </button>
+          </motion.button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">

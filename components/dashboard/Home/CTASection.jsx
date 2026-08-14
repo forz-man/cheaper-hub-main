@@ -8,11 +8,12 @@ const CTASection = () => {
     <section className="py-20 px-6 bg-white">
       <div className="container">
         <motion.div 
-          className="border border-gray-200 rounded-3xl p-12 md:p-16 text-center bg-gray-50 hover:border-black transition-all duration-300"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          whileHover={{ y: -4 }}
+          className="border border-gray-200 rounded-3xl p-12 md:p-16 text-center bg-gray-50 cursor-default"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ type: "spring", stiffness: 80, damping: 15 }}
+          whileHover={{ y: -8, scale: 1.015, borderColor: "#000000", boxShadow: "0 25px 50px rgba(0,0,0,0.06)" }}
         >
           <h2 className="text-3xl md:text-4xl font-extrabold text-black mb-4">
             Ready to join the <br className="sm:hidden" />

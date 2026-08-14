@@ -6,7 +6,7 @@
     "node": ">=20.9.0 <25"
   },
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 5000",
+    "dev": "next dev -H 0.0.0.0 -p 3000 --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
