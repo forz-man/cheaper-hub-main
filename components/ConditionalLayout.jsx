@@ -1,30 +1,32 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import Navbar from "./Navbar";
-import Footer from "./Footer";
 
-/**
- * Routes that manage their own navigation (sidebar, inline nav, or focused
- * checkout flow).  The global Navbar and Footer are suppressed for these.
- */
-function isSuppressed(pathname) {
-  return (
-    pathname === "/checkout" ||
-    pathname === "/order-success" ||
-    pathname.startsWith("/order-success/") ||
-    pathname.startsWith("/products/")   // detail pages have their own inline nav
-  );
-}
+// List the routes where you DO NOT want the Navbar or Footer to appear
+const hideOnRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 export function NavbarWrapper() {
   const pathname = usePathname();
-  if (isSuppressed(pathname)) return null;
-  return <Navbar />;
+  
+  if (hideOnRoutes.includes(pathname)) return null;
+
+  return (
+    <header className="p-4 bg-gray-100 border-b">
+      {/* TODO: Import and render your actual Navbar component here */}
+      <nav className="font-bold">Cheaper Navbar placeholder</nav>
+    </header>
+  );
 }
 
 export function FooterWrapper() {
   const pathname = usePathname();
-  if (isSuppressed(pathname)) return null;
-  return <Footer />;
+  
+  if (hideOnRoutes.includes(pathname)) return null;
+
+  return (
+    <footer className="p-4 bg-gray-100 border-t mt-auto">
+      {/* TODO: Import and render your actual Footer component here */}
+      <p className="text-sm">Cheaper Footer placeholder</p>
+    </footer>
+  );
 }

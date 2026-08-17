@@ -14,6 +14,7 @@ const PUBLIC_ROUTES = new Set([
   "/contact",
 ]);
 
+// ⬇️ THIS IS THE FIX: The function is explicitly named 'proxy' ⬇️
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -72,7 +73,6 @@ export const config = {
   matcher: [
     /*
      * Match all paths except Next.js internals and static files.
-     * The proxy function itself filters to the right subset.
      */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
