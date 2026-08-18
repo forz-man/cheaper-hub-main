@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";
 import AuthCard from "@/components/auth/AuthCard";
 import PasswordStrength from "@/components/auth/PasswordStrength";
-import { supabase } from "@/lib/supabase";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -25,17 +24,22 @@ export default function ResetPasswordPage() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
 
-      if (error) {
-        setError(error.message);
+      if (!res.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
         setLoading(false);
       } else {
         router.push("/login");
       }
     } catch (err) {
       console.error("[ResetPassword] Network exception:", err);
-      setError("Unable to connect to Supabase. Please try again.");
+      setError("Unable to connect. Please try again.");
       setLoading(false);
     }
   };
