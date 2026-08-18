@@ -100,8 +100,6 @@ function MarketplaceContent() {
       else if (sortBy === "price_desc") q = q.order("price", { ascending: false });
       else q = q.order("created_at", { ascending: false });
 
-      q = q.limit(96);
-
       const { data, error } = await q;
 
       if (!error) {

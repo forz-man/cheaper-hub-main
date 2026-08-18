@@ -295,10 +295,44 @@ function ProductsSection({ tab }) {
     }
   };
 
+  const handleToggleTodaysDeal = async (product) => {
+    setActionLoading(product.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          is_todays_deal: !product.is_todays_deal,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to update homepage deals");
+      }
+      const updated = await res.json();
+      setProducts((prev) => prev.map((p) => (
+        p.id === product.id
+          ? { ...p, is_todays_deal: updated.is_todays_deal }
+          : p
+      )));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder={`Search ${approvalTabLabel} products...`} />
+        {approvalStatus === "approved" && (
+          <p className="text-xs text-gray-400 max-w-xs">
+            Use “Add to home” to hand-pick the products shown in Today&apos;s Deals.
+          </p>
+        )}
       </div>
 
       {error && (
@@ -332,6 +366,9 @@ function ProductsSection({ tab }) {
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Price</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Stock</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Date</th>
+                  {approvalStatus === "approved" && (
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Homepage</th>
+                  )}
                   <th className="px-5 py-3.5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -367,6 +404,27 @@ function ProductsSection({ tab }) {
                       <td className="px-5 py-4 font-semibold text-black">${Number(p.price).toFixed(2)}</td>
                       <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">{p.stock === 0 ? <span className="text-red-500 font-semibold">0</span> : p.stock}</td>
                       <td className="px-5 py-4 text-gray-400 text-xs hidden lg:table-cell">{formatDate(p.created_at)}</td>
+                      {approvalStatus === "approved" && (
+                        <td className="px-5 py-4">
+                          <button
+                            onClick={() => handleToggleTodaysDeal(p)}
+                            disabled={actionLoading === p.id}
+                            className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-xl border transition-colors disabled:opacity-40 ${
+                              p.is_todays_deal
+                                ? "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                                : "text-gray-500 bg-white border-gray-200 hover:border-black hover:text-black"
+                            }`}
+                          >
+                            <Star
+                              size={11}
+                              className={`inline mr-1 ${
+                                p.is_todays_deal ? "fill-amber-500 text-amber-500" : ""
+                              }`}
+                            />
+                            {p.is_todays_deal ? "On home" : "Add to home"}
+                          </button>
+                        </td>
+                      )}
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
                           {approvalStatus === "pending" && (
@@ -377,27 +435,36 @@ function ProductsSection({ tab }) {
                                 disabled={actionLoading === p.id}
                                 className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-40 cursor-pointer"
                               >
-                                {actionLoading === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                {actionLoading === p.id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle2 size={12} />
+                                )}
                                 Approve
                               </motion.button>
+
                               <motion.button
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setRejectionModal(p)}
                                 disabled={actionLoading === p.id}
                                 className="flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-100 transition-colors disabled:opacity-40 cursor-pointer"
                               >
-                                <XCircle size={12} /> Reject
+                                <XCircle size={12} />
+                                Reject
                               </motion.button>
                             </>
                           )}
-                          {(approvalStatus === "approved" || approvalStatus === "rejected") && (
+
+                          {(approvalStatus === "approved" ||
+                            approvalStatus === "rejected") && (
                             <a
                               href={`/products/${p.id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs font-semibold text-gray-500 border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 hover:text-black transition-colors"
                             >
-                              <Eye size={12} /> View
+                              <Eye size={12} />
+                              View
                             </a>
                           )}
                         </div>

@@ -50,6 +50,46 @@ function normalizeProduct(raw) {
   };
 }
 
+const RELATED_STOP_WORDS = new Set([
+  "and", "the", "for", "with", "from", "new", "best", "sale",
+  "your", "this", "that", "pro", "plus", "edition", "model",
+]);
+
+function productTerms(value) {
+  return new Set(
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((term) => term.length > 1 && !RELATED_STOP_WORDS.has(term)),
+  );
+}
+
+function rankRelatedProducts(current, candidates) {
+  const currentNameTerms = productTerms(current.name);
+  const currentDescriptionTerms = productTerms(current.description);
+
+  return candidates
+    .map((candidate) => {
+      const candidateNameTerms = productTerms(candidate.name);
+      const candidateDescriptionTerms = productTerms(candidate.description);
+      const nameOverlap = [...currentNameTerms].filter((term) => candidateNameTerms.has(term)).length;
+      const descriptionOverlap = [...currentDescriptionTerms].filter((term) => candidateDescriptionTerms.has(term)).length;
+      const sameCategory = current.category && candidate.category === current.category;
+
+      return {
+        ...candidate,
+        relatedScore:
+          nameOverlap * 100 +
+          descriptionOverlap * 5 +
+          (sameCategory ? 10 : 0),
+      };
+    })
+    .sort((a, b) => b.relatedScore - a.relatedScore)
+    .slice(0, 4)
+    .map(({ relatedScore, ...candidate }) => candidate);
+}
+
 export default function ProductPage({ params }) {
   const shouldReduceMotion = useReducedMotion();
   const { id } = use(params);
@@ -58,6 +98,7 @@ export default function ProductPage({ params }) {
   const { user, loading: authLoading } = useAuth();
 
   const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
@@ -231,6 +272,23 @@ export default function ProductPage({ params }) {
               .maybeSingle()
           : { data: null };
         setProduct(mergeVendorProfile(normalizedProduct, vendorProfile));
+
+        const { data: relatedData } = await supabase
+            .from("products")
+            .select("id, name, description, price, original_price, images, category, vendor_name, created_at")
+            .eq("approval_status", "approved")
+            .eq("status", "active")
+            .neq("id", id)
+            .order("created_at", { ascending: false })
+            .limit(40);
+
+        const relatedCandidates = (relatedData || []).map((item) => ({
+          ...item,
+          images: Array.isArray(item.images) ? item.images : [],
+          price: Number(item.price),
+          original_price: item.original_price ? Number(item.original_price) : null,
+        }));
+        setRelatedProducts(rankRelatedProducts(normalizedProduct, relatedCandidates));
       }
       setDbLoading(false);
     }
@@ -809,6 +867,57 @@ export default function ProductPage({ params }) {
                 )}
               </button>
             </div>
+
+            {relatedProducts.length > 0 && (
+              <div className="bg-white border border-[#e2ddd6] rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-[#111]">Related items</h2>
+                  <Link
+                    href={`/marketplace?category=${encodeURIComponent(product.category)}`}
+                    className="text-[11px] font-semibold text-[#4648d4] hover:underline"
+                  >
+                    See more
+                  </Link>
+                </div>
+                <div className="space-y-3">
+                  {relatedProducts.map((related) => (
+                    <Link
+                      key={related.id}
+                      href={`/products/${related.id}`}
+                      className="flex items-center gap-3 group"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-[#f9f8f6] border border-[#f0ede8] flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {related.images[0] ? (
+                          <img
+                            src={related.images[0]}
+                            alt={related.name}
+                            className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <Package size={18} className="text-[#d8d5cf]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-[#111] truncate group-hover:underline">
+                          {related.name}
+                        </p>
+                        <p className="text-[10px] text-[#999] truncate mt-0.5">
+                          {related.vendor_name || "Seller information unavailable"}
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className="text-xs font-bold text-[#111]">${related.price.toFixed(2)}</span>
+                          {related.original_price && (
+                            <span className="text-[10px] text-[#bbb] line-through">
+                              ${related.original_price.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

@@ -87,7 +87,7 @@ export async function PATCH(req) {
       );
     }
 
-    const { product_id, approval_status, rejection_reason } = body;
+    const { product_id, approval_status, rejection_reason, is_todays_deal } = body;
 
     if (!product_id || typeof product_id !== "string") {
       return withSecurityHeaders(
@@ -95,7 +95,8 @@ export async function PATCH(req) {
       );
     }
 
-    if (!approval_status || !VALID_APPROVAL_STATUSES.includes(approval_status)) {
+    const isDealToggle = typeof is_todays_deal === "boolean";
+    if (!isDealToggle && (!approval_status || !VALID_APPROVAL_STATUSES.includes(approval_status))) {
       return withSecurityHeaders(
         NextResponse.json({ message: "Invalid approval_status. Must be one of: pending, approved, rejected" }, { status: 400 })
       );
@@ -103,7 +104,7 @@ export async function PATCH(req) {
 
     const { data: product } = await admin
       .from("products")
-      .select("id, name, vendor_id, vendor_name, approval_status")
+      .select("id, name, vendor_id, vendor_name, approval_status, is_todays_deal")
       .eq("id", product_id)
       .single();
 
@@ -113,11 +114,15 @@ export async function PATCH(req) {
       );
     }
 
+    const update = isDealToggle
+      ? { is_todays_deal }
+      : { approval_status };
+
     const { data, error: dbError } = await admin
       .from("products")
-      .update({ approval_status })
+      .update(update)
       .eq("id", product_id)
-      .select("id, name, approval_status, vendor_id, vendor_name")
+      .select("id, name, approval_status, is_todays_deal, vendor_id, vendor_name")
       .single();
 
     if (dbError) {
@@ -126,7 +131,7 @@ export async function PATCH(req) {
       );
     }
 
-    if (approval_status === "approved" && product.vendor_id) {
+    if (!isDealToggle && approval_status === "approved" && product.vendor_id) {
       await createNotification({
         user_id: product.vendor_id,
         type: "product_approved",
@@ -137,7 +142,7 @@ export async function PATCH(req) {
       });
     }
 
-    if (approval_status === "rejected" && product.vendor_id) {
+    if (!isDealToggle && approval_status === "rejected" && product.vendor_id) {
       await createNotification({
         user_id: product.vendor_id,
         type: "product_rejected",
@@ -148,14 +153,21 @@ export async function PATCH(req) {
       });
     }
 
-    const actionLabel = approval_status === "approved" ? "approve_product" : "reject_product";
+    const actionLabel = isDealToggle
+      ? (is_todays_deal ? "feature_todays_deal" : "unfeature_todays_deal")
+      : (approval_status === "approved" ? "approve_product" : "reject_product");
     await logActivity({
       actor_id: adminUser.id,
       action: actionLabel,
       entity_type: "product",
       entity_id: product.id,
-      description: `${actionLabel.replace("_", " ")}: "${product.name}"`,
-      metadata: { product_id: product.id, approval_status, rejection_reason: rejection_reason || null },
+      description: `${actionLabel.replaceAll("_", " ")}: "${product.name}"`,
+      metadata: {
+        product_id: product.id,
+        approval_status: approval_status || product.approval_status,
+        is_todays_deal: isDealToggle ? is_todays_deal : product.is_todays_deal,
+        rejection_reason: rejection_reason || null,
+      },
     });
 
     const response = NextResponse.json(data, { status: 200 });

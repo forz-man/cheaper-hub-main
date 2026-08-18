@@ -18,7 +18,7 @@ export default function HomePage() {
 
     async function loadData() {
       try {
-        const fetchPromise = fetch("/api/products").then(async (response) => {
+        const fetchPromise = fetch("/api/products?surface=todays-deals").then(async (response) => {
           if (!response.ok) throw new Error("Failed to load products");
           const data = await response.json();
           return Array.isArray(data) ? data : [];

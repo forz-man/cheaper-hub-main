@@ -14,6 +14,7 @@ create table if not exists public.products (
   stock integer default 0 not null,
   status text default 'active' check (status in ('active', 'draft', 'out_of_stock')),
   approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
+  is_todays_deal boolean not null default false,
   features text[] default array[]::text[],
   specs jsonb default '{}'::jsonb,
   images jsonb default '[]'::jsonb,
@@ -30,6 +31,7 @@ alter table public.products add column if not exists images jsonb default '[]'::
 alter table public.products add column if not exists external_id text;
 alter table public.products add column if not exists source_platform text;
 alter table public.products add column if not exists source_url text;
+alter table public.products add column if not exists is_todays_deal boolean not null default false;
 
 -- Unique index for upsert deduplication when syncing from external platforms.
 -- Allows the same vendor to have the same product from different platforms.
@@ -39,6 +41,10 @@ create unique index if not exists products_vendor_external_platform_idx
 
 create index if not exists products_approval_status_idx
   on public.products(approval_status);
+
+create index if not exists products_todays_deal_idx
+  on public.products(is_todays_deal)
+  where is_todays_deal = true;
 
 alter table public.products enable row level security;
 

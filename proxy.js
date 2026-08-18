@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = new Set([
   "/contact",
   "/sustainability",
   "/api/products",
+  "/api/deals",
   "/api/reviews",
 ]);
 
@@ -46,7 +47,10 @@ function isAuthRoute(pathname) {
 }
 
 function isPublicApiRoute(pathname) {
-  return pathname === "/api/products" || pathname === "/api/reviews" || pathname === "/api/contact";
+  return pathname === "/api/products"
+    || pathname === "/api/deals"
+    || pathname === "/api/reviews"
+    || pathname === "/api/contact";
 }
 
 export async function proxy(request) {
