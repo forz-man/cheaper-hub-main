@@ -1,13 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { sendPasswordChangedEmail } from "@/lib/emails/password-changed";
+import { sendEmailChangedNotification } from "@/lib/emails/email-changed";
 
 export async function POST(request) {
-  const { password } = await request.json();
+  const { email: newEmail } = await request.json();
 
-  if (!password || typeof password !== "string" || password.length < 6) {
-    return NextResponse.json({ error: "Invalid password." }, { status: 400 });
+  if (!newEmail || typeof newEmail !== "string" || !newEmail.includes("@")) {
+    return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -37,26 +37,29 @@ export async function POST(request) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const { error } = await supabase.auth.updateUser({ password });
+  if (newEmail.toLowerCase() === user.email.toLowerCase()) {
+    return NextResponse.json(
+      { error: "New email is the same as your current email." },
+      { status: 400 }
+    );
+  }
+
+  const oldEmail = user.email;
+
+  const { error } = await supabase.auth.updateUser({ email: newEmail });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Fire the security notification email — non-blocking, never fails the request.
+  // Notify both old and new addresses — non-blocking, never fails the request.
   const changedAt = new Date().toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   });
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : "");
-  const resetPasswordUrl = `${origin}/reset-password`;
 
-  sendPasswordChangedEmail({ email: user.email, changedAt, resetPasswordUrl }).catch(
-    (err) => console.error("[update-password] Failed to send email:", err.message)
+  sendEmailChangedNotification({ oldEmail, newEmail, changedAt }).catch((err) =>
+    console.error("[update-email] Failed to send notification:", err.message)
   );
 
   return NextResponse.json({ success: true });
