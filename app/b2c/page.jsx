@@ -38,8 +38,8 @@ export default function B2CPage() {
 
         {/* ── Hero ── */}
         <section className="pt-32 pb-20 px-4">
-          <div className="max-w-[1280px] mx-auto grid lg:grid-cols-2 gap-12 items-center">
-            <div>
+          <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-12 items-center">
+            <div className="min-w-0">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#6ffbbe]/40 text-[#005236] rounded-full text-xs font-bold tracking-widest mb-6">
                 <Zap size={14} /> FOR INDIVIDUALS
               </div>
@@ -90,7 +90,7 @@ export default function B2CPage() {
 
             <div className="rounded-3xl overflow-hidden shadow-2xl">
               <img
-                className="w-full h-[420px] object-cover"
+                className="w-full h-[280px] sm:h-[360px] lg:h-[420px] object-cover"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDg_LaA5mig0XQReFmZkZlO9G3xgtML8QX4LzWFDRsN1DeHE1Swtn9Ro57gu4lcUZ0k8kXC2k7xXgwdW7Sb2XVoBd98-nLK0l--nWlvgCBq-9fdR-CxSQiARyAHhYhMo_dTZ6-19VVSLf9wZVY3HYQWIxH_dbBzS2Py9wylQQ9UsYAyKm0IdMTBKQFMTRz--D949b0ziHbnchVbg4YvqLtWrzeGUzo82p3OASCQxjSgc1CQ7qTJJOnDOmx_62-ce_FuDDNMfDtsXmY1"
                 alt="Smart consumer shopping"
               />
@@ -151,7 +151,7 @@ export default function B2CPage() {
 
         {/* ── CTA ── */}
         <section className="py-20 px-4">
-          <div className="max-w-[1280px] mx-auto bg-[#131b2e] rounded-[2rem] p-12 md:p-20 text-center">
+          <div className="max-w-[1280px] mx-auto bg-[#131b2e] rounded-[2rem] p-6 sm:p-10 md:p-20 text-center">
             <h2 className="text-white text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
               Start Saving Today — It&apos;s Free
             </h2>

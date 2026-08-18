@@ -417,10 +417,10 @@ export default function ProductPage({ params }) {
           <ArrowLeft size={16} /> Back
         </button>
 
-        <div className="grid lg:grid-cols-[1fr_380px] gap-8">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] gap-8">
 
           {/* ── Left: Images + Tabs ── */}
-          <div>
+          <div className="min-w-0">
             {/* Main image */}
             <div className="bg-white border border-[#e2ddd6] rounded-2xl overflow-hidden mb-3 relative">
               {pct && (
@@ -428,7 +428,7 @@ export default function ProductPage({ params }) {
                   {pct}% off
                 </div>
               )}
-              <div className="flex items-center justify-center h-[340px] sm:h-[420px] bg-[#f9f8f6] overflow-hidden">
+              <div className="flex items-center justify-center h-[260px] sm:h-[340px] lg:h-[420px] bg-[#f9f8f6] overflow-hidden">
                 {product.images?.[activeImage] ? (
                   <img src={product.images[activeImage]} alt={product.name} className="w-full h-full object-contain p-6" />
                 ) : (
@@ -456,7 +456,7 @@ export default function ProductPage({ params }) {
 
             {/* Thumbnails */}
             {product.images?.length > 0 ? (
-              <div className="flex gap-2 mb-8">
+              <div className="flex flex-wrap gap-2 mb-8">
                 {product.images.map((img, i) => (
                   <button
                     key={img + i}
@@ -470,7 +470,7 @@ export default function ProductPage({ params }) {
                 ))}
               </div>
             ) : (
-              <div className="flex gap-2 mb-8">
+              <div className="flex flex-wrap gap-2 mb-8">
                 {[0, 1, 2, 3].map((i) => (
                   <div
                     key={i}
@@ -484,7 +484,7 @@ export default function ProductPage({ params }) {
 
             {/* Tabs */}
             <div className="bg-white border border-[#e2ddd6] rounded-2xl overflow-hidden">
-              <div className="flex border-b border-[#e2ddd6]">
+              <div className="flex overflow-x-auto border-b border-[#e2ddd6]">
                 {[
                   { id: "description", label: "Description" },
                   { id: "features", label: "Features" },
@@ -494,7 +494,7 @@ export default function ProductPage({ params }) {
                   <button
                     key={id}
                     onClick={() => setActiveTab(id)}
-                    className={`flex-1 py-3.5 text-sm font-medium transition-colors border-b-2 ${
+                    className={`min-w-max flex-1 px-3 sm:px-4 py-3.5 text-xs sm:text-sm font-medium transition-colors border-b-2 ${
                       activeTab === id
                         ? "border-[#111] text-[#111]"
                         : "border-transparent text-[#888] hover:text-[#555]"
@@ -507,7 +507,7 @@ export default function ProductPage({ params }) {
 
               <div className="p-6">
                 {activeTab === "description" && (
-                  <p className="text-sm text-[#555] leading-relaxed">{product.description}</p>
+                  <p className="text-sm text-[#555] leading-relaxed break-words">{product.description}</p>
                 )}
 
                 {activeTab === "features" && (
@@ -532,8 +532,8 @@ export default function ProductPage({ params }) {
                     <div className="divide-y divide-[#f0ede8]">
                       {Object.entries(product.specs).map(([key, val]) => (
                         <div key={key} className="flex py-3 gap-4">
-                          <span className="text-xs font-semibold text-[#888] w-32 flex-shrink-0">{key}</span>
-                          <span className="text-sm text-[#555]">{String(val)}</span>
+                          <span className="text-xs font-semibold text-[#888] w-24 sm:w-32 flex-shrink-0">{key}</span>
+                          <span className="min-w-0 break-words text-sm text-[#555]">{String(val)}</span>
                         </div>
                       ))}
                     </div>

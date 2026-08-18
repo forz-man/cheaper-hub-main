@@ -182,7 +182,7 @@ export default function SustainabilityPage() {
           }}
         />
         {/* green glow */}
-        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[min(700px,100vw)] h-[400px] rounded-full bg-emerald-400/10 blur-3xl" />
 
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
