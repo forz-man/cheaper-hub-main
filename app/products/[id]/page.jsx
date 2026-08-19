@@ -411,7 +411,7 @@ export default function ProductPage({ params }) {
   return (
     <div className="min-h-screen bg-[#f5f3ef] pt-14 sm:pt-16 md:pt-[72px]" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
 
-      <div className="max-w-6xl mx-auto px-5 md:px-8 pb-8">
+      <div className="max-w-7xl mx-auto px-5 md:px-8 pb-8">
 
         <button onClick={handleBack} className="flex items-center gap-1.5 text-sm text-[#888] hover:text-[#111] transition-colors mb-4">
           <ArrowLeft size={16} /> Back
