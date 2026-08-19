@@ -2,17 +2,41 @@
 
 import { Monitor, Shirt, Sofa, Utensils, Dumbbell, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
+import { useRef } from "react";
+import { useRouter } from "next/navigation";
 
 const categories = [
-  { Icon: Monitor, label: "Electronics", count: "12,400+" },
-  { Icon: Shirt, label: "Fashion", count: "8,200+" },
-  { Icon: Sofa, label: "Home & Living", count: "6,800+" },
-  { Icon: Utensils, label: "Food & Bev", count: "3,100+" },
-  { Icon: Dumbbell, label: "Sports", count: "4,500+" },
-  { Icon: BookOpen, label: "Books", count: "9,700+" },
+  { Icon: Monitor, label: "Electronics", searchCategory: "Electronics", count: "12,400+" },
+  { Icon: Shirt, label: "Fashion", searchCategory: "Fashion", count: "8,200+" },
+  { Icon: Sofa, label: "Home & Living", searchCategory: "Home", count: "6,800+" },
+  { Icon: Utensils, label: "Food & Bev", searchCategory: "Kitchen", count: "3,100+" },
+  { Icon: Dumbbell, label: "Sports", searchCategory: "Sports", count: "4,500+" },
+  { Icon: BookOpen, label: "Books", searchCategory: "Books", count: "9,700+" },
 ];
 
 const CategoriesSection = () => {
+  const router = useRouter();
+  const lastTapRef = useRef({ category: null, time: 0 });
+
+  const searchCategory = (category) => {
+    router.push(`/marketplace?category=${encodeURIComponent(category.searchCategory)}`);
+  };
+
+  const handleTouchEnd = (category, event) => {
+    const now = event.timeStamp;
+    const lastTap = lastTapRef.current;
+    const isDoubleTap =
+      lastTap.category === category.label && now - lastTap.time < 350;
+
+    if (isDoubleTap) {
+      lastTapRef.current = { category: null, time: 0 };
+      searchCategory(category);
+      return;
+    }
+
+    lastTapRef.current = { category: category.label, time: now };
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -43,7 +67,7 @@ const CategoriesSection = () => {
         <div className="flex justify-between items-end mb-8">
           <div>
             <h2 className="text-2xl font-bold text-black">Shop by Category</h2>
-            <p className="text-sm text-gray-400 mt-1">Find what you&apos;re looking for</p>
+            <p className="text-sm text-gray-400 mt-1">Double-click or double-tap a category to browse</p>
           </div>
         </div>
         
@@ -53,12 +77,18 @@ const CategoriesSection = () => {
           initial="hidden"
           animate="visible"
         >
-          {categories.map(({ Icon, label, count }) => (
+          {categories.map((category) => {
+            const { Icon, label, count } = category;
+
+            return (
             <motion.button 
               key={label} 
-              className="group bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-center gap-3 hover:border-black hover:shadow-xl transition-all duration-300 text-center"
+              type="button"
+              className="group touch-manipulation bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-center gap-3 hover:border-black hover:shadow-xl transition-all duration-300 text-center"
               variants={itemVariants}
               whileHover={{ y: -4 }}
+              onDoubleClick={() => searchCategory(category)}
+              onTouchEnd={(event) => handleTouchEnd(category, event)}
             >
               <div className="p-3 bg-gray-50 rounded-full group-hover:bg-black transition-colors duration-300">
                 <Icon size={28} className="text-gray-500 group-hover:text-white transition-colors duration-300" />
@@ -68,7 +98,8 @@ const CategoriesSection = () => {
                 <div className="text-[10px] text-gray-400 mt-0.5">{count} items</div>
               </div>
             </motion.button>
-          ))}
+            );
+          })}
         </motion.div>
       </div>
     </section>
