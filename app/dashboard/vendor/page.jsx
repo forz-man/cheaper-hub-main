@@ -1039,7 +1039,7 @@ export default function VendorDashboard() {
           {/* INTEGRATIONS */}
           {activeTab === "integrations" && (
             <motion.div key="integrations" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
-              <IntegrationsTab onAddProduct={openAddProduct} />
+              <IntegrationsTab onAddProduct={openAddProduct} onImportCsv={openCsvImport} />
             </motion.div>
           )}
 

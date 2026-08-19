@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, RefreshCw, Trash2, Loader2, CheckCircle2,
-  AlertTriangle, ExternalLink, X, ChevronRight, Upload,
+  AlertTriangle, ExternalLink, X, ChevronRight, Upload, FileSpreadsheet,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -199,7 +199,7 @@ function syncIssueText(issue) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function IntegrationsTab({ onAddProduct }) {
+export default function IntegrationsTab({ onAddProduct, onImportCsv }) {
   const [connections, setConnections]         = useState([]);
   const [loading, setLoading]                 = useState(true);
 
@@ -511,6 +511,12 @@ export default function IntegrationsTab({ onAddProduct }) {
           className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors"
         >
           <Plus size={14} /> Add single product
+        </button>
+        <button
+          onClick={onImportCsv}
+          className="flex items-center gap-2 bg-white border border-gray-200 text-black px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors"
+        >
+          <FileSpreadsheet size={14} /> Import CSV
         </button>
       </div>
 
