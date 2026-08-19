@@ -43,10 +43,6 @@ yarn-error.log*
 next-env.d.ts
 
 
-#replit command
-.replit
-
-
 # Local Netlify folder
 .netlify
 
