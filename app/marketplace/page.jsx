@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useCart } from "@/lib/cart-context";
 import ProductCard from "@/components/ProductCard";
 import { mergeVendorProfiles } from "@/lib/vendor-display";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 const CATEGORIES = [
   { id: "all",         label: "All Products",     icon: Package },
@@ -41,6 +42,7 @@ const itemVariants = {
 };
 
 function MarketplaceContent() {
+  const shouldReduceMotion = useReducedMotion();
   const { count, openCart } = useCart();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,6 +58,15 @@ function MarketplaceContent() {
   const [selectedVendor, setSelectedVendor]     = useState("all");
   const [sortBy, setSortBy]               = useState("newest");
   const [priceRange, setPriceRange]       = useState([0, 1000]);
+  const [isMobile, setIsMobile]           = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const vendorOptions = useMemo(() => {
     const names = products
@@ -234,18 +245,21 @@ function MarketplaceContent() {
             </motion.button>
 
             {/* Sort */}
-            <div className="relative">
+            <motion.div 
+              whileTap={{ scale: 0.96 }}
+              className="relative"
+            >
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
-                className="px-5 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-black appearance-none cursor-pointer hover:border-black hover:shadow-lg transition-all duration-300 pr-10"
+                className="px-5 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-black appearance-none cursor-pointer hover:border-black hover:shadow-lg transition-all duration-300 pr-10 w-full"
               >
                 {SORT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
               <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+            </motion.div>
 
             {/* Grid / List */}
             <div className="flex border border-gray-200 rounded-2xl overflow-hidden bg-white">
@@ -286,13 +300,25 @@ function MarketplaceContent() {
 
         {/* ── Filter panel ── */}
         <AnimatePresence>
+          {showFilters && isMobile && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFilters(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
           {showFilters && (
             <motion.div
-              className="bg-white border border-gray-200 rounded-3xl p-6 mb-8 shadow-xl"
-              initial={{ opacity: 0, height: 0, y: -20 }}
-              animate={{ opacity: 1, height: "auto", y: 0 }}
-              exit={{ opacity: 0, height: 0, y: -20 }}
-              transition={{ duration: 0.4, type: "spring" }}
+              className={isMobile ? "fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl p-6 shadow-2xl border-t border-gray-200 max-h-[85vh] overflow-y-auto" : "bg-white border border-gray-200 rounded-3xl p-6 mb-8 shadow-xl"}
+              initial={isMobile ? { y: "100%" } : { opacity: 0, height: 0, y: -20 }}
+              animate={isMobile ? { y: 0 } : { opacity: 1, height: "auto", y: 0 }}
+              exit={isMobile ? { y: "100%" } : { opacity: 0, height: 0, y: -20 }}
+              transition={shouldReduceMotion ? { duration: 0 } : (isMobile ? { type: "spring", damping: 25, stiffness: 220 } : { duration: 0.4, type: "spring" })}
             >
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
@@ -323,7 +349,8 @@ function MarketplaceContent() {
                             ? "bg-black text-white shadow-lg shadow-black/20"
                             : "text-gray-600 hover:bg-gray-100"
                         }`}
-                        whileHover={{ x: 4 }}
+                        whileHover={shouldReduceMotion ? {} : { x: 4 }}
+                        whileTap={{ scale: 0.96 }}
                       >
                         <cat.icon size={14} />
                         {cat.label}
@@ -347,7 +374,8 @@ function MarketplaceContent() {
                             ? "bg-black text-white shadow-lg shadow-black/20"
                             : "text-gray-600 hover:bg-gray-100"
                         }`}
-                        whileHover={{ x: 4 }}
+                        whileHover={shouldReduceMotion ? {} : { x: 4 }}
+                        whileTap={{ scale: 0.96 }}
                       >
                         {ven.label}
                       </motion.button>
@@ -388,8 +416,9 @@ function MarketplaceContent() {
                     {[5, 4, 3, 2, 1].map(star => (
                       <motion.button
                         key={star}
-                        className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 w-full"
-                        whileHover={{ x: 4 }}
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 w-full text-left"
+                        whileHover={shouldReduceMotion ? {} : { x: 4 }}
+                        whileTap={{ scale: 0.96 }}
                       >
                         <div className="flex items-center gap-0.5">
                           {[...Array(5)].map((_, i) => (
@@ -407,16 +436,16 @@ function MarketplaceContent() {
                 <motion.button
                   onClick={() => setShowFilters(false)}
                   className="px-6 py-2.5 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-all duration-300 shadow-lg shadow-black/20"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
                 >
                   Apply Filters
                 </motion.button>
                 <motion.button
                   onClick={clearFilters}
                   className="px-6 py-2.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all duration-300"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
                 >
                   Clear All
                 </motion.button>

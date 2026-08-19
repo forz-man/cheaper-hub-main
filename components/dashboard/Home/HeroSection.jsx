@@ -6,8 +6,11 @@ import { Search, Package, Store, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 
+import useReducedMotion from "@/hooks/useReducedMotion";
+
 const HeroSection = () => {
   const [query, setQuery] = useState("");
+  const shouldReduceMotion = useReducedMotion();
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -21,14 +24,14 @@ const HeroSection = () => {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2
+        staggerChildren: shouldReduceMotion ? 0 : 0.1,
+        delayChildren: shouldReduceMotion ? 0 : 0.2
       }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 35 },
     visible: {
       opacity: 1,
       y: 0,
@@ -41,7 +44,7 @@ const HeroSection = () => {
   };
 
   const imageVariants = {
-    animate: {
+    animate: shouldReduceMotion ? {} : {
       y: [0, -20, 0],
       rotate: [0, 5, 0, -5, 0],
       transition: {
@@ -53,7 +56,7 @@ const HeroSection = () => {
   };
 
   const floatingVariants = {
-    animate: {
+    animate: shouldReduceMotion ? {} : {
       y: [0, -10, 0],
       transition: {
         duration: 4,
@@ -64,7 +67,7 @@ const HeroSection = () => {
   };
 
   const pulseVariants = {
-    animate: {
+    animate: shouldReduceMotion ? {} : {
       scale: [1, 1.03, 1],
       transition: {
         duration: 2,
@@ -87,7 +90,7 @@ const HeroSection = () => {
           
           <motion.div
             variants={containerVariants}
-            initial="visible"
+            initial="hidden"
             animate="visible"
             className="text-center lg:text-left"
           >

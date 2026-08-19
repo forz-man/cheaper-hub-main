@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
 import ReviewModal from "@/components/reviews/ReviewModal";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 const statusConfig = {
   delivered: { label: "Delivered", color: "text-emerald-700 bg-emerald-50 border-emerald-100", Icon: CheckCircle },
@@ -52,20 +53,27 @@ const fadeUp = {
 // ─── Shared tab bar ────────────────────────────────────────────────────────────
 
 function TabBar({ tabs, activeTab, setActiveTab }) {
+  const shouldReduceMotion = useReducedMotion();
   return (
     <div className="flex gap-1 flex-wrap">
       {tabs.map(({ id, label, Icon, badge, href }) => (
         href ? (
-          <Link key={id} href={href}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black">
-            <Icon size={14} />
-            {label}
-          </Link>
-        ) : (
-          <button
+          <motion.div
             key={id}
+            whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
+          >
+            <Link href={href}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black">
+              <Icon size={14} />
+              {label}
+            </Link>
+          </motion.div>
+        ) : (
+          <motion.button
+            key={id}
+            whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer ${
               activeTab === id
                 ? "bg-black text-white shadow-lg shadow-black/15"
                 : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"
@@ -78,7 +86,7 @@ function TabBar({ tabs, activeTab, setActiveTab }) {
                 activeTab === id ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
               }`}>{badge}</span>
             )}
-          </button>
+          </motion.button>
         )
       ))}
     </div>
@@ -86,8 +94,13 @@ function TabBar({ tabs, activeTab, setActiveTab }) {
 }
 
 function StatCard({ label, value, sub, Icon }) {
+  const shouldReduceMotion = useReducedMotion();
+  const innerFadeUp = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+  };
   return (
-    <motion.div variants={fadeUp}
+    <motion.div variants={innerFadeUp}
       className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-lg hover:shadow-black/5 hover:border-gray-300 transition-all duration-300"
     >
       <div className="flex items-center justify-between mb-3">
@@ -105,11 +118,23 @@ function StatCard({ label, value, sub, Icon }) {
 const VALID_TABS = ["overview", "orders", "wishlist", "settings"];
 
 export default function BuyerDashboard() {
+  const shouldReduceMotion = useReducedMotion();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [wishlist, setWishlist] = useState([]);
+
+  const innerTabVariants = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
+    exit: shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -6, transition: { duration: 0.15 } },
+  };
+
+  const innerStagger = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: shouldReduceMotion ? 0 : 0.06, delayChildren: shouldReduceMotion ? 0 : 0.05 } },
+  };
 
   // Deep-link support: /dashboard/buyer?tab=orders (used by the navbar's
   // Profile/Orders/Wishlist/Settings links).
@@ -356,6 +381,8 @@ export default function BuyerDashboard() {
 
           {/* OVERVIEW */}
           {activeTab === "overview" && (
+            <motion.div key="overview" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
+              <motion.div variants={innerStagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <motion.div key="overview" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
               <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
@@ -441,7 +468,7 @@ export default function BuyerDashboard() {
 
           {/* ORDERS */}
           {activeTab === "orders" && (
-            <motion.div key="orders" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="orders" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex gap-1 flex-wrap mb-6">
                 {[
                   { label: "All", value: "all" },
@@ -452,11 +479,15 @@ export default function BuyerDashboard() {
                   const count = value === "all" ? orders.length : orders.filter(o => normStatus(o.status) === value).length;
                   const active = ordersFilter === value;
                   return (
-                    <button key={value} onClick={() => setOrdersFilter(value)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${active ? "bg-black text-white shadow-lg shadow-black/15" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"}`}>
+                    <motion.button 
+                      key={value} 
+                      onClick={() => setOrdersFilter(value)}
+                      whileTap={{ scale: 0.95 }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${active ? "bg-black text-white shadow-lg shadow-black/15" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"}`}
+                    >
                       {label}
                       <span className={`text-[10px] font-bold tabular-nums ${active ? "opacity-60" : "text-gray-400"}`}>{count}</span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -518,10 +549,13 @@ export default function BuyerDashboard() {
                                   const r = reviewEligibility[ek];
                                   if (r && !r.loading && r.canReview) {
                                     return (
-                                      <button onClick={() => openReviewModal(firstItem, order.id)}
-                                        className="text-[10px] font-semibold text-white bg-black px-2.5 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap">
+                                      <motion.button 
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => openReviewModal(firstItem, order.id)}
+                                        className="text-[10px] font-semibold text-white bg-black px-2.5 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap cursor-pointer"
+                                      >
                                         Leave Review
-                                      </button>
+                                      </motion.button>
                                     );
                                   }
                                   if (r && !r.loading && r.alreadyReviewed) {
@@ -566,17 +600,18 @@ export default function BuyerDashboard() {
 
                         {/* Confirm delivery button */}
                         {canConfirm && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.97 }}
                             onClick={() => handleConfirmDelivery(order.id)}
                             disabled={confirmingOrderId === order.id}
-                            className="mt-3 w-full flex items-center justify-center gap-2 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="mt-3 w-full flex items-center justify-center gap-2 bg-black text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                           >
                             {confirmingOrderId === order.id ? (
-                              <><Loader2 size={14} className="animate-spin" /> Confirming…</>
+                                <><Loader2 size={14} className="animate-spin" /> Confirming…</>
                             ) : (
-                              <><CheckCircle size={14} /> Confirm I received this order</>
+                               <><CheckCircle size={14} /> Confirm I received this order</>
                             )}
-                          </button>
+                          </motion.button>
                         )}
 
                         {order.order_items?.length > 1 && (
@@ -591,10 +626,13 @@ export default function BuyerDashboard() {
                                     const r = reviewEligibility[ek];
                                     if (r && !r.loading && r.canReview) {
                                       return (
-                                        <button onClick={() => openReviewModal(item, order.id)}
-                                          className="text-[10px] font-semibold text-white bg-black px-2 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap">
+                                        <motion.button 
+                                          whileTap={{ scale: 0.95 }}
+                                          onClick={() => openReviewModal(item, order.id)}
+                                          className="text-[10px] font-semibold text-white bg-black px-2 py-0.5 rounded-full hover:bg-gray-800 transition-colors whitespace-nowrap cursor-pointer"
+                                        >
                                           Leave Review
-                                        </button>
+                                        </motion.button>
                                       );
                                     }
                                     if (r && !r.loading && r.alreadyReviewed) {
@@ -621,7 +659,7 @@ export default function BuyerDashboard() {
 
           {/* WISHLIST */}
           {activeTab === "wishlist" && (
-            <motion.div key="wishlist" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="wishlist" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex items-center justify-between mb-6">
                 <p className="text-sm text-gray-400">
                   <span className="font-semibold text-black">{wishlist.length}</span> {wishlist.length === 1 ? "item" : "items"}
@@ -664,12 +702,21 @@ export default function BuyerDashboard() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                          <button onClick={() => removeFromWishlist(item.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => removeFromWishlist(item.id)} 
+                            className="text-gray-300 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                          >
                             <X size={15} />
-                          </button>
-                          <Link href={`/products/${item.id}`} className="text-[10px] font-semibold text-black hover:underline mt-auto">
-                            View →
-                          </Link>
+                          </motion.button>
+                          <motion.div
+                            whileTap={{ scale: 0.95 }}
+                            className="mt-auto"
+                          >
+                            <Link href={`/products/${item.id}`} className="text-[10px] font-semibold text-black hover:underline block">
+                              View →
+                            </Link>
+                          </motion.div>
                         </div>
                       </div>
                     );
@@ -681,7 +728,7 @@ export default function BuyerDashboard() {
 
           {/* SETTINGS */}
           {activeTab === "settings" && (
-            <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="settings" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="space-y-4 max-w-2xl">
                 {[
                   { title: "Full name", desc: "Your name shown on orders and reviews", value: displayName },

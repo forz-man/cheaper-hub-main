@@ -23,29 +23,43 @@ const SellSection = () => {
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+  const leftItemVariants = {
+    hidden: { opacity: 0, x: -50 },
     visible: {
       opacity: 1,
-      y: 0,
+      x: 0,
       transition: {
         type: "spring",
-        damping: 15,
-        stiffness: 100
+        damping: 18,
+        stiffness: 90
+      }
+    }
+  };
+
+  const rightItemVariants = {
+    hidden: { opacity: 0, x: 50 },
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: {
+        type: "spring",
+        damping: 18,
+        stiffness: 90
       }
     }
   };
 
   return (
-    <section id="sell" className="py-20 px-6 bg-black">
+    <section id="sell" className="py-20 px-6 bg-black overflow-hidden">
       <div className="container">
         <motion.div 
           className="grid lg:grid-cols-2 gap-16 items-start"
           variants={containerVariants}
           initial="hidden"
-          animate="visible"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
         >
-          <motion.div variants={itemVariants}>
+          <motion.div variants={leftItemVariants}>
             <p className="text-xs font-semibold text-gray-500 tracking-widest uppercase mb-5">For Sellers</p>
             <h2 className="text-4xl font-extrabold text-white leading-tight mb-5">
               Your store, your products, <br />your buyers.
@@ -64,8 +78,8 @@ const SellSection = () => {
                 <motion.div 
                   key={title} 
                   className="flex items-start gap-4 group cursor-default"
-                  whileHover={{ x: 5 }}
-                  transition={{ duration: 0.3 }}
+                  whileHover={{ x: 6 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
                   <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:border-white/30 transition-colors">
                     <Icon size={16} className="text-gray-400 group-hover:text-white transition-colors" />
@@ -78,19 +92,23 @@ const SellSection = () => {
               ))}
             </div>
 
-            <Link href="/register?role=vendor" className="inline-flex items-center gap-2 bg-white text-black px-7 py-3.5 rounded-xl font-semibold text-sm hover:bg-gray-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10">
-              Start selling free <ArrowRight size={15} />
-            </Link>
+            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} className="inline-block">
+              <Link href="/register?role=vendor" className="group inline-flex items-center gap-2 bg-white text-black px-7 py-3.5 rounded-xl font-semibold text-sm hover:bg-gray-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10">
+                Start selling free <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform duration-200" />
+              </Link>
+            </motion.div>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
+          <motion.div variants={rightItemVariants}>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-5">Connect your store</p>
             <div className="grid grid-cols-2 gap-3 mb-3">
               {integrations.map(({ name, bg, initial }) => (
                 <motion.div 
                   key={name} 
-                  className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center gap-3 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
+                  className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center gap-3 transition-all cursor-pointer"
+                  whileHover={{ y: -6, scale: 1.04, backgroundColor: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.2)" }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 18 }}
                 >
                   <div className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ backgroundColor: bg }}>
                     {initial}
@@ -100,8 +118,10 @@ const SellSection = () => {
               ))}
             </div>
             <motion.div 
-              className="bg-white/5 border border-dashed border-white/15 rounded-xl p-5 flex items-center gap-3 cursor-pointer hover:bg-white/10 transition-colors"
-              whileHover={{ scale: 1.02 }}
+              className="bg-white/5 border border-dashed border-white/15 rounded-xl p-5 flex items-center gap-3 cursor-pointer transition-colors"
+              whileHover={{ y: -6, scale: 1.04, backgroundColor: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.2)" }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 300, damping: 18 }}
             >
               <div className="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
                 <Upload size={15} className="text-gray-400" />

@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
 import IntegrationsTab from "@/components/dashboard/IntegrationsTab";
+import useReducedMotion from "@/hooks/useReducedMotion";
 
 const statusConfig = {
   delivered: { label: "Delivered", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
@@ -209,13 +210,15 @@ const fadeUp = {
 // ─── Shared tab bar ────────────────────────────────────────────────────────────
 
 function TabBar({ tabs, activeTab, setActiveTab }) {
+  const shouldReduceMotion = useReducedMotion();
   return (
     <div className="flex gap-1 flex-wrap">
       {tabs.map(({ id, label, Icon, badge }) => (
-        <button
+        <motion.button
           key={id}
+          whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
           onClick={() => setActiveTab(id)}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer ${
             activeTab === id
               ? "bg-black text-white shadow-lg shadow-black/15"
               : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black"
@@ -228,15 +231,20 @@ function TabBar({ tabs, activeTab, setActiveTab }) {
               activeTab === id ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
             }`}>{badge}</span>
           )}
-        </button>
+        </motion.button>
       ))}
     </div>
   );
 }
 
 function StatCard({ label, value, sub, Icon }) {
+  const shouldReduceMotion = useReducedMotion();
+  const innerFadeUp = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+  };
   return (
-    <motion.div variants={fadeUp}
+    <motion.div variants={innerFadeUp}
       className="bg-white border border-gray-200 rounded-2xl p-5 hover:shadow-lg hover:shadow-black/5 hover:border-gray-300 transition-all duration-300"
     >
       <div className="flex items-center justify-between mb-3">
@@ -254,11 +262,23 @@ function StatCard({ label, value, sub, Icon }) {
 const VALID_TABS = ["overview", "products", "orders", "payouts", "integrations", "settings"];
 
 export default function VendorDashboard() {
+  const shouldReduceMotion = useReducedMotion();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
+
+  const innerTabVariants = {
+    hidden: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
+    exit: shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -6, transition: { duration: 0.15 } },
+  };
+
+  const innerStagger = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: shouldReduceMotion ? 0 : 0.06, delayChildren: shouldReduceMotion ? 0 : 0.05 } },
+  };
 
   // Deep-link support: /dashboard/vendor?tab=orders (used by the navbar's
   // Profile/Orders/Settings links).
@@ -736,14 +756,15 @@ export default function VendorDashboard() {
 
           {/* OVERVIEW */}
           {activeTab === "overview" && (
-            <motion.div key="overview" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="overview" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex items-center justify-end mb-6">
-                <motion.button onClick={openAddProduct} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                <motion.button onClick={openAddProduct} whileHover={shouldReduceMotion ? {} : { scale: 1.02 }} whileTap={{ scale: 0.96 }}
                   className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
                   <Plus size={16} /> Add product
                 </motion.button>
               </div>
 
+              <motion.div variants={innerStagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: "Total products", value: productsLoading ? "…" : String(products.length), sub: "Live listings", Icon: Package },
@@ -813,21 +834,23 @@ export default function VendorDashboard() {
 
           {/* PRODUCTS */}
           {activeTab === "products" && (
+            <motion.div key="products" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
+              <div className="flex items-center justify-between mb-6">
             <motion.div key="products" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <p className="text-sm text-gray-400">
                   <span className="font-semibold text-black">{products.length}</span> {products.length === 1 ? "product" : "products"}
                 </p>
-                 <div className="flex items-center gap-2">
-                   <motion.button onClick={openCsvImport} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                     className="flex items-center gap-2 bg-white border border-gray-200 text-black px-4 py-2.5 rounded-xl text-sm font-semibold hover:border-gray-400 transition-all">
-                     <FileSpreadsheet size={16} /> Import CSV
-                   </motion.button>
-                   <motion.button onClick={openAddProduct} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                     className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
-                     <Plus size={16} /> Add product
-                   </motion.button>
-                 </div>
+                <div className="flex items-center gap-2">
+                  <motion.button onClick={openCsvImport} whileHover={shouldReduceMotion ? {} : { scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                    className="flex items-center gap-2 bg-white border border-gray-200 text-black px-4 py-2.5 rounded-xl text-sm font-semibold hover:border-gray-400 transition-all">
+                    <FileSpreadsheet size={16} /> Import CSV
+                  </motion.button>
+                  <motion.button onClick={openAddProduct} whileHover={shouldReduceMotion ? {} : { scale: 1.02 }} whileTap={{ scale: 0.96 }}
+                    className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
+                    <Plus size={16} /> Add product
+                  </motion.button>
+                </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-2xl flex items-center mb-5 overflow-hidden shadow-sm hover:border-gray-400 focus-within:border-black focus-within:ring-2 focus-within:ring-black/5 transition-all">
@@ -860,7 +883,7 @@ export default function VendorDashboard() {
                   </div>
                   <p className="text-base font-semibold text-black mb-1">No products yet</p>
                   <p className="text-sm text-gray-400 mb-6">Add your first product to start selling on Cheaper</p>
-                  <motion.button onClick={openAddProduct} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  <motion.button onClick={openAddProduct} whileHover={shouldReduceMotion ? {} : { scale: 1.02 }} whileTap={{ scale: 0.96 }}
                     className="bg-black text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">
                     Add a product
                   </motion.button>
@@ -945,7 +968,7 @@ export default function VendorDashboard() {
 
           {/* ORDERS */}
           {activeTab === "orders" && (
-            <motion.div key="orders" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="orders" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="mb-6 bg-white border border-gray-200 rounded-2xl px-5 py-4 flex items-start gap-3">
                 <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
                   <TrendingUp size={14} className="text-gray-400" />
@@ -1006,22 +1029,24 @@ export default function VendorDashboard() {
                           </td>
                           <td className="px-5 py-4 text-right">
                             {action ? (
-                              <button
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => handleUpdateFulfillment(item, action.next)}
                                 disabled={updatingItemId === item.id || (action.next === "delivered" && notPaid)}
                                 title={action.next === "delivered" && notPaid ? "Order not paid yet" : undefined}
-                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                               >
                                 {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : action.label}
-                              </button>
+                              </motion.button>
                             ) : canRetryPayout ? (
-                              <button
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => handleUpdateFulfillment(item, "delivered")}
                                 disabled={updatingItemId === item.id}
-                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                               >
                                 {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : "Retry payout"}
-                              </button>
+                              </motion.button>
                             ) : (
                               <span className="text-xs text-gray-300">—</span>
                             )}
@@ -1038,14 +1063,14 @@ export default function VendorDashboard() {
 
           {/* INTEGRATIONS */}
           {activeTab === "integrations" && (
-            <motion.div key="integrations" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="integrations" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <IntegrationsTab onAddProduct={openAddProduct} />
             </motion.div>
           )}
 
           {/* PAYOUTS */}
           {activeTab === "payouts" && (
-            <motion.div key="payouts" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="payouts" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="max-w-2xl space-y-4">
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
                   <div className="flex items-start gap-4">
@@ -1070,23 +1095,25 @@ export default function VendorDashboard() {
 
                       <div className="mt-4 flex gap-3">
                         {!payoutsReady && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleConnectStripe}
                             disabled={stripeActionLoading}
-                            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             {stripeActionLoading ? <Loader2 size={13} className="animate-spin" /> : <Landmark size={13} />}
                             {stripeStatus?.connected ? "Finish setup" : "Connect bank account"}
-                          </button>
+                          </motion.button>
                         )}
                         {stripeStatus?.connected && (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
                             onClick={handleOpenStripeDashboard}
                             disabled={stripeActionLoading}
-                            className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-2 bg-white text-black border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold hover:border-gray-400 transition-colors disabled:opacity-50 cursor-pointer"
                           >
                             <ExternalLink size={13} /> View Stripe dashboard
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     </div>
@@ -1117,7 +1144,7 @@ export default function VendorDashboard() {
 
           {/* SETTINGS */}
           {activeTab === "settings" && (
-            <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div key="settings" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="space-y-4 max-w-2xl">
                 {[
                   { title: "Store name", desc: "Your public store name on the marketplace", value: displayName + "'s Store" },

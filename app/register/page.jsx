@@ -7,8 +7,11 @@ import AuthShell from "@/components/auth/AuthShell";
 import AuthCard from "@/components/auth/AuthCard";
 import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import PasswordStrength from "@/components/auth/PasswordStrength";
+import useReducedMotion from "@/hooks/useReducedMotion";
+import { motion } from "framer-motion";
 
 function RegisterForm() {
+  const shouldReduceMotion = useReducedMotion();
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawRole = searchParams.get("role");
@@ -124,47 +127,56 @@ function RegisterForm() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input
+          <motion.input
             type="text"
             placeholder="Full name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
+            whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="h-11 w-full rounded-lg border border-[#e2ddd6] px-4 text-sm outline-none focus:border-[#111] text-[#111] placeholder:text-[#bbb] transition-colors"
           />
-          <input
+          <motion.input
             type="email"
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="h-11 w-full rounded-lg border border-[#e2ddd6] px-4 text-sm outline-none focus:border-[#111] text-[#111] placeholder:text-[#bbb] transition-colors"
           />
           <div className="relative">
-            <input
+            <motion.input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
+              whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className="h-11 w-full rounded-lg border border-[#e2ddd6] px-4 pr-16 text-sm outline-none focus:border-[#111] text-[#111] placeholder:text-[#bbb] transition-colors"
             />
-            <button
+            <motion.button
               type="button"
+              whileTap={{ scale: 0.9 }}
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#888] hover:text-[#111] transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#888] hover:text-[#111] transition-colors cursor-pointer"
             >
               {showPassword ? "Hide" : "Show"}
-            </button>
+            </motion.button>
           </div>
-          <input
+          <motion.input
             type="password"
             placeholder="Confirm password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             autoComplete="new-password"
+            whileFocus={shouldReduceMotion ? {} : { scale: 1.015 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="h-11 w-full rounded-lg border border-[#e2ddd6] px-4 text-sm outline-none focus:border-[#111] text-[#111] placeholder:text-[#bbb] transition-colors"
           />
 
@@ -185,14 +197,15 @@ function RegisterForm() {
             </span>
           </label>
 
-          <button
+          <motion.button
             type="submit"
             onClick={handleSubmit}
             disabled={loading}
-            className="h-11 w-full rounded-lg bg-[#111] font-semibold text-white text-sm hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            whileTap={{ scale: 0.97 }}
+            className="h-11 w-full rounded-lg bg-[#111] font-semibold text-white text-sm hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {loading ? "Creating Account..." : role === "vendor" ? "Create Seller Account" : "Create Buyer Account"}
-          </button>
+          </motion.button>
         </form>
 
         <p className="mt-5 text-center text-sm text-[#888]">

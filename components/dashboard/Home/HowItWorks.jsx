@@ -34,9 +34,10 @@ const HowItWorks = () => {
       <div className="container">
         <motion.div 
           className="mb-12 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ type: "spring", stiffness: 100, damping: 15 }}
         >
           <p className="text-xs font-semibold text-black tracking-widest uppercase mb-3">Simple by design</p>
           <h2 className="text-3xl font-extrabold text-black">How it works</h2>
@@ -47,12 +48,14 @@ const HowItWorks = () => {
           className="grid md:grid-cols-2 gap-6"
           variants={containerVariants}
           initial="hidden"
-          animate="visible"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
         >
           <motion.div 
-            className="bg-gray-50 border border-gray-200 rounded-2xl p-8 hover:border-black transition-all duration-300"
+            className="bg-gray-50 border border-gray-200 rounded-2xl p-8 hover:border-black transition-all duration-300 cursor-default"
             variants={itemVariants}
-            whileHover={{ y: -4 }}
+            whileHover={{ y: -8, scale: 1.02, boxShadow: "0 20px 40px rgba(0,0,0,0.05)" }}
+            whileTap={{ scale: 0.99 }}
           >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">For Buyers</p>
             <div className="space-y-7">
@@ -71,16 +74,17 @@ const HowItWorks = () => {
               ))}
             </div>
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <Link href="/register?role=buyer" className="inline-flex items-center gap-2 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
-                Shop now <ArrowRight size={14} />
+              <Link href="/register?role=buyer" className="group inline-flex items-center gap-2 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
+                Shop now <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
             </div>
           </motion.div>
 
           <motion.div 
-            className="bg-black border border-gray-800 rounded-2xl p-8 hover:border-gray-600 transition-all duration-300"
+            className="bg-black border border-gray-800 rounded-2xl p-8 hover:border-gray-600 transition-all duration-300 cursor-default"
             variants={itemVariants}
-            whileHover={{ y: -4 }}
+            whileHover={{ y: -8, scale: 1.02, boxShadow: "0 20px 45px rgba(0,0,0,0.35)" }}
+            whileTap={{ scale: 0.99 }}
           >
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-6">For Sellers</p>
             <div className="space-y-7">
@@ -99,8 +103,8 @@ const HowItWorks = () => {
               ))}
             </div>
             <div className="mt-8 pt-6 border-t border-gray-800">
-              <Link href="/register?role=vendor" className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-gray-400 transition-colors">
-                Start selling <ArrowRight size={14} />
+              <Link href="/register?role=vendor" className="group inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-gray-400 transition-colors">
+                Start selling <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
             </div>
           </motion.div>

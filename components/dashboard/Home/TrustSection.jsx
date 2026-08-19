@@ -42,9 +42,10 @@ const TrustSection = () => {
       <div className="container">
         <motion.div 
           className="text-center mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ type: "spring", stiffness: 100, damping: 15 }}
         >
           <h2 className="text-2xl font-bold text-black">Why Choose Cheaper?</h2>
           <p className="text-sm text-gray-400 mt-1">Trusted by thousands of buyers and sellers</p>
@@ -54,14 +55,16 @@ const TrustSection = () => {
           className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
           variants={containerVariants}
           initial="hidden"
-          animate="visible"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
         >
           {trustItems.map(({ Icon, title, desc }) => (
             <motion.div 
               key={title} 
-              className="flex items-start gap-4 p-6 bg-white rounded-2xl border border-gray-200 hover:border-black hover:shadow-xl transition-all duration-300"
+              className="flex items-start gap-4 p-6 bg-white rounded-2xl border border-gray-200 hover:border-black transition-all duration-300 cursor-default"
               variants={itemVariants}
-              whileHover={{ y: -4 }}
+              whileHover={{ y: -8, scale: 1.03, boxShadow: "0 20px 40px rgba(0,0,0,0.06)" }}
+              whileTap={{ scale: 0.99 }}
             >
               <div className="p-2 bg-black rounded-lg flex-shrink-0">
                 <Icon size={18} className="text-white" />
