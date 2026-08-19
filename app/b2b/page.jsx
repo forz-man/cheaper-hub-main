@@ -6,6 +6,7 @@ import {
   ShieldCheck, Package, TrendingUp, Users, FileText,
   Headphones, Globe, Share2, Rss, Smartphone,
 } from "lucide-react";
+import BrandMark from "@/components/BrandMark";
 
 export default function B2BPage() {
   return (
@@ -15,17 +16,15 @@ export default function B2BPage() {
       <header className="fixed top-0 w-full z-50 glass border-b border-white/20 shadow-sm">
         <div className="flex justify-between items-center max-w-[1280px] mx-auto px-4 md:px-10 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-[#4648d4] flex items-center justify-center">
-              <span className="text-white font-bold text-lg" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-9 w-auto" priority />
             <span className="font-bold text-xl tracking-tight text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8">
-            <Link className="text-[#4648d4] font-semibold text-sm" href="/b2b">For Business</Link>
-            <Link className="text-[#45464d] font-medium text-sm hover:text-[#4648d4] transition-colors" href="/b2c">For Individuals</Link>
-            <a className="text-[#45464d] font-medium text-sm hover:text-[#4648d4] transition-colors" href="#">Support</a>
+            <Link className="text-[#4D8337] font-semibold text-sm" href="/b2b">For Business</Link>
+            <Link className="text-[#45464d] font-medium text-sm hover:text-[#4D8337] transition-colors" href="/b2c">For Individuals</Link>
+            <a className="text-[#45464d] font-medium text-sm hover:text-[#4D8337] transition-colors" href="#">Support</a>
           </nav>
-          <Link href="/register?role=vendor" className="bg-[#4648d4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:scale-105 transition-transform">
+          <Link href="/register?role=vendor" className="bg-[#4D8337] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#3E6D2E] hover:scale-105 transition-transform">
             Start for Free
           </Link>
         </div>
@@ -37,21 +36,21 @@ export default function B2BPage() {
         <section className="pt-32 pb-20 px-4">
           <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-12 items-center">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#4648d4]/10 text-[#4648d4] rounded-full text-xs font-bold tracking-widest mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#EFF7EA] text-[#4D8337] rounded-full text-xs font-bold tracking-widest mb-6">
                 <Building2 size={14} /> BUSINESS SOLUTIONS
               </div>
               <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6 tracking-tight" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
                 Bulk Procurement<br />
-                <span className="text-[#4648d4]">Made Simple.</span>
+                <span className="text-[#4D8337]">Made Simple.</span>
               </h1>
               <p className="text-[#45464d] text-lg mb-8 max-w-xl">
                 Instant RFQ engine, verified supplier network, enterprise pricing, and dedicated account management — everything your business needs to source smarter.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                <Link href="/register?role=buyer" className="flex items-center justify-center gap-2 bg-[#4648d4] text-white px-8 py-4 rounded-xl font-bold text-sm shadow-lg shadow-[#4648d4]/20 hover:scale-105 transition-transform">
+                <Link href="/register?role=buyer" className="flex items-center justify-center gap-2 bg-[#4D8337] text-white px-8 py-4 rounded-xl font-bold text-sm shadow-lg shadow-[#84BA64]/30 hover:bg-[#3E6D2E] hover:scale-105 transition-transform">
                   Access B2B Portal <ArrowRight size={16} />
                 </Link>
-                <a href="#features" className="flex items-center justify-center gap-2 bg-white text-[#4648d4] border-2 border-[#4648d4]/20 px-8 py-4 rounded-xl font-bold text-sm hover:bg-[#4648d4]/5 transition-colors">
+                <a href="#features" className="flex items-center justify-center gap-2 bg-white text-[#4D8337] border-2 border-[#84BA64]/30 px-8 py-4 rounded-xl font-bold text-sm hover:bg-[#EFF7EA] transition-colors">
                   See How It Works
                 </a>
               </div>
@@ -83,11 +82,11 @@ export default function B2BPage() {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { Icon: FileText, bg: "bg-[#4648d4]/10", color: "text-[#4648d4]", title: "Instant RFQ Engine", desc: "Send quote requests to multiple suppliers simultaneously and compare responses in one place." },
-                { Icon: ShieldCheck, bg: "bg-[#6ffbbe]/20", color: "text-[#005236]", title: "Verified Suppliers", desc: "Every supplier is pre-vetted. View certifications, reviews, and compliance documents before buying." },
+                { Icon: FileText, bg: "bg-[#EFF7EA]", color: "text-[#4D8337]", title: "Instant RFQ Engine", desc: "Send quote requests to multiple suppliers simultaneously and compare responses in one place." },
+                { Icon: ShieldCheck, bg: "bg-[#E0EDD8]", color: "text-[#315F23]", title: "Verified Suppliers", desc: "Every supplier is pre-vetted. View certifications, reviews, and compliance documents before buying." },
                 { Icon: BarChart3, bg: "bg-[#131b2e]", color: "text-white", title: "Spend Analytics", desc: "Real-time dashboards showing category spend, supplier performance, and savings opportunities." },
-                { Icon: Package, bg: "bg-[#4648d4]/10", color: "text-[#4648d4]", title: "Bulk Pricing Tiers", desc: "Automatic volume discounts applied at checkout — from 10 units to 10,000." },
-                { Icon: Users, bg: "bg-[#6ffbbe]/20", color: "text-[#005236]", title: "Team Accounts", desc: "Multi-user access with role-based permissions and approval workflows for your procurement team." },
+                { Icon: Package, bg: "bg-[#EFF7EA]", color: "text-[#4D8337]", title: "Bulk Pricing Tiers", desc: "Automatic volume discounts applied at checkout — from 10 units to 10,000." },
+                { Icon: Users, bg: "bg-[#E0EDD8]", color: "text-[#315F23]", title: "Team Accounts", desc: "Multi-user access with role-based permissions and approval workflows for your procurement team." },
                 { Icon: Headphones, bg: "bg-[#131b2e]", color: "text-white", title: "Dedicated Support", desc: "A dedicated account manager for enterprise accounts. Priority SLA for all business customers." },
               ].map(({ Icon, bg, color, title, desc }) => (
                 <div key={title} className="p-8 rounded-2xl shadow-sm border border-[#c6c6cd]/20 hover:shadow-xl hover:-translate-y-1 transition-all">
@@ -106,7 +105,7 @@ export default function B2BPage() {
         <section className="py-24 px-4">
           <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-16 items-center">
             <div className="min-w-0">
-              <div className="inline-block px-4 py-1 bg-[#4648d4]/10 text-[#4648d4] rounded-full text-xs font-bold tracking-widest mb-6">WHY CHEAPER B2B</div>
+              <div className="inline-block px-4 py-1 bg-[#EFF7EA] text-[#4D8337] rounded-full text-xs font-bold tracking-widest mb-6">WHY CHEAPER B2B</div>
               <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Everything Your Procurement Team Needs</h2>
               <ul className="space-y-5">
                 {[
@@ -118,7 +117,7 @@ export default function B2BPage() {
                   "Compliance documentation and audit trails",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <CheckCircle size={20} className="text-[#4648d4] flex-shrink-0 mt-0.5" />
+                    <CheckCircle size={20} className="text-[#4D8337] flex-shrink-0 mt-0.5" />
                     <span className="text-[#45464d] text-sm">{item}</span>
                   </li>
                 ))}
@@ -135,7 +134,7 @@ export default function B2BPage() {
                 { val: "99.9%", label: "Platform uptime SLA" },
               ].map(({ val, label }) => (
                 <div key={label} className="p-8 bg-white rounded-2xl shadow-sm border border-[#c6c6cd]/20 text-center">
-                  <div className="text-3xl font-bold text-[#4648d4] mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{val}</div>
+                  <div className="text-3xl font-bold text-[#4D8337] mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{val}</div>
                   <div className="text-[#45464d] text-sm">{label}</div>
                 </div>
               ))}
@@ -153,7 +152,7 @@ export default function B2BPage() {
               Join 10,000+ businesses already saving with Cheaper&apos;s B2B marketplace.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link href="/register?role=buyer" className="bg-[#4648d4] text-white px-10 py-5 rounded-2xl font-bold text-sm hover:scale-105 transition-transform">
+              <Link href="/register?role=buyer" className="bg-[#4D8337] text-white px-10 py-5 rounded-2xl font-bold text-sm hover:bg-[#3E6D2E] hover:scale-105 transition-transform">
                 Get Started Free
               </Link>
               <button className="bg-white/10 text-white px-10 py-5 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">

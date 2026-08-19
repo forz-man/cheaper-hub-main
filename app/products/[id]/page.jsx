@@ -627,7 +627,7 @@ export default function ProductPage({ params }) {
                         {!user && (
                           <div className="mb-6 p-4 bg-[#f9f8f6] border border-[#e2ddd6] rounded-xl text-center">
                             <p className="text-xs text-[#888]">
-                              <Link href="/login" className="text-[#4648d4] font-semibold hover:underline">Sign in</Link> to leave a review.
+                              <Link href="/login" className="text-[#4D8337] font-semibold hover:underline">Sign in</Link> to leave a review.
                             </p>
                           </div>
                         )}
@@ -730,7 +730,7 @@ export default function ProductPage({ params }) {
               <button
                 onClick={handleContactSeller}
                 disabled={contactLoading}
-                className="w-full mt-3 bg-[#4648d4] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#3537b8] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-3 bg-[#4D8337] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#3E6D2E] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {contactLoading ? (
                   <>
@@ -805,7 +805,7 @@ export default function ProductPage({ params }) {
                     </div>
                   </div>
                 </div>
-                <button className="text-xs font-semibold text-[#4648d4] flex items-center gap-1 hover:underline">
+                <button className="text-xs font-semibold text-[#4D8337] flex items-center gap-1 hover:underline">
                   Visit <ExternalLink size={11} />
                 </button>
               </div>
@@ -833,7 +833,7 @@ export default function ProductPage({ params }) {
               <button 
                 onClick={handleContactSeller}
                 disabled={contactLoading}
-                className="w-full mt-3 bg-[#4648d4] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#3537b8] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-3 bg-[#4D8337] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#3E6D2E] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {contactLoading ? (
                   <>
@@ -855,7 +855,7 @@ export default function ProductPage({ params }) {
                   <h2 className="text-sm font-semibold text-[#111]">Related items</h2>
                   <Link
                     href={`/marketplace?category=${encodeURIComponent(product.category)}`}
-                    className="text-[11px] font-semibold text-[#4648d4] hover:underline"
+                    className="text-[11px] font-semibold text-[#4D8337] hover:underline"
                   >
                     See more
                   </Link>

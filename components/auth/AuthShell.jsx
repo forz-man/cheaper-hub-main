@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
 
 export default function AuthShell({ children }) {
   return (
@@ -8,9 +9,7 @@ export default function AuthShell({ children }) {
         {/* Left panel */}
         <section className="hidden lg:flex bg-[#111] text-white p-10 flex-col justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center">
-              <span className="text-white font-bold text-xs" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-7 w-auto" priority />
             <span className="font-bold text-base" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
 

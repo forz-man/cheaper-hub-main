@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Search, Package, Store, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import BrandMark from "@/components/BrandMark";
 
 const HeroSection = () => {
   const [query, setQuery] = useState("");
@@ -128,7 +129,7 @@ const HeroSection = () => {
               className="max-w-lg mx-auto lg:mx-0 mb-5"
             >
               <motion.div 
-                className="bg-white border border-gray-200 rounded-full flex items-center shadow-md hover:shadow-lg transition-shadow duration-300 focus-within:ring-2 focus-within:ring-black/10 focus-within:border-black"
+                className="bg-white border border-gray-200 rounded-full flex items-center shadow-md hover:shadow-lg transition-shadow duration-300 focus-within:ring-2 focus-within:ring-[#84BA64]/25 focus-within:border-[#84BA64]"
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", damping: 20 }}
               >
@@ -141,7 +142,7 @@ const HeroSection = () => {
                 />
                 <motion.button 
                   type="submit"
-                  className="bg-black text-white px-5 py-2 rounded-full text-sm font-semibold m-1.5 hover:bg-gray-800 transition-all duration-300 flex items-center gap-2"
+                  className="bg-[#4D8337] text-white px-5 py-2 rounded-full text-sm font-semibold m-1.5 hover:bg-[#3E6D2E] transition-all duration-300 flex items-center gap-2"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -158,7 +159,7 @@ const HeroSection = () => {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link 
                   href="/register?role=buyer" 
-                  className="group flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-gray-800 transition-all duration-300 hover:shadow-xl hover:shadow-black/20"
+                  className="group flex items-center justify-center gap-2 bg-[#4D8337] text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-[#3E6D2E] transition-all duration-300 hover:shadow-xl hover:shadow-[#84BA64]/30"
                 >
                   <Package size={16} />
                   Start shopping
@@ -168,7 +169,7 @@ const HeroSection = () => {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link 
                   href="/register?role=vendor" 
-                  className="group flex items-center justify-center gap-2 bg-white text-black border border-gray-300 px-6 py-3 rounded-full font-semibold text-sm hover:border-black hover:shadow-lg transition-all duration-300"
+                  className="group flex items-center justify-center gap-2 bg-white text-black border border-gray-300 px-6 py-3 rounded-full font-semibold text-sm hover:border-[#84BA64] hover:shadow-lg transition-all duration-300"
                 >
                   <Store size={16} />
                   Start selling
@@ -185,12 +186,12 @@ const HeroSection = () => {
           >
             <div className="relative w-full max-w-md">
               <motion.div 
-                className="absolute -top-10 -left-10 w-20 h-20 bg-black/5 rounded-full blur-2xl"
+                className="absolute -top-10 -left-10 w-20 h-20 bg-[#84BA64]/20 rounded-full blur-2xl"
                 variants={floatingVariants}
                 animate="animate"
               />
               <motion.div 
-                className="absolute -bottom-10 -right-10 w-20 h-20 bg-black/5 rounded-full blur-2xl"
+                className="absolute -bottom-10 -right-10 w-20 h-20 bg-[#84BA64]/20 rounded-full blur-2xl"
                 variants={floatingVariants}
                 animate="animate"
                 transition={{ delay: 1 }}
@@ -205,9 +206,7 @@ const HeroSection = () => {
                 
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">C</span>
-                    </div>
+                    <BrandMark className="h-10 w-auto" />
                     <div>
                       <p className="font-bold text-sm text-black">Cheaper</p>
                       <p className="text-[10px] text-gray-400">Marketplace</p>
@@ -227,7 +226,7 @@ const HeroSection = () => {
                         <p className="text-xs text-gray-400">$49.99</p>
                       </div>
                       <motion.div 
-                        className="w-8 h-8 bg-black rounded-full flex items-center justify-center"
+                        className="w-8 h-8 bg-[#4D8337] rounded-full flex items-center justify-center"
                         whileHover={{ scale: 1.1 }}
                       >
                         <ArrowRight size={14} className="text-white" />

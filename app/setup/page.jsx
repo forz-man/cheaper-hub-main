@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle, Copy, ExternalLink } from "lucide-react";
+import BrandMark from "@/components/BrandMark";
 
 const SQL = `-- Products table
 create table if not exists public.products (
@@ -89,9 +90,7 @@ export default function SetupPage() {
       <div className="w-full max-w-2xl">
         <div className="mb-6">
           <Link href="/" className="flex items-center gap-2 mb-8 w-fit">
-            <div className="w-7 h-7 rounded-md bg-[#111] flex items-center justify-center">
-              <span className="text-white font-bold text-xs" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-7 w-auto" priority />
             <span className="font-bold text-base" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
           <h1 className="text-2xl font-bold text-[#111] mb-2" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
@@ -107,7 +106,7 @@ export default function SetupPage() {
             <span className="text-xs font-semibold text-[#888] uppercase tracking-wide">SQL</span>
             <button
               onClick={copy}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#4648d4] hover:underline"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#4D8337] hover:underline"
             >
               {copied ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} />}
               {copied ? "Copied!" : "Copy all"}

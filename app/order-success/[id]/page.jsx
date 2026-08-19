@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle, Package, ArrowRight, ShoppingBag, Loader2, AlertTriangle, Shield } from "lucide-react";
 import { Suspense } from "react";
 import { useCart } from "@/lib/cart-context";
+import BrandMark from "@/components/BrandMark";
 
 function OrderSuccessContent({ id }) {
   const searchParams = useSearchParams();
@@ -97,9 +98,7 @@ function OrderSuccessContent({ id }) {
 
         <div className="flex justify-center mb-10">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-[#111] flex items-center justify-center">
-              <span className="text-white font-bold text-sm" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-8 w-auto" priority />
             <span className="font-bold text-lg" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
         </div>
@@ -193,7 +192,7 @@ function OrderSuccessContent({ id }) {
 
         <p className="text-center text-xs text-[#bbb]">
           Questions? Contact{" "}
-          <a href="mailto:support@cheaper.com" className="text-[#4648d4] hover:underline">support@cheaper.com</a>
+          <a href="mailto:support@cheaper.com" className="text-[#4D8337] hover:underline">support@cheaper.com</a>
         </p>
       </div>
     </div>

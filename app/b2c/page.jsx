@@ -7,6 +7,7 @@ import {
   Share2, Globe, Smartphone, BadgeCheck,
 } from "lucide-react";
 import { useState } from "react";
+import BrandMark from "@/components/BrandMark";
 
 export default function B2CPage() {
   const [query, setQuery] = useState("");
@@ -18,17 +19,15 @@ export default function B2CPage() {
       <header className="fixed top-0 w-full z-50 glass border-b border-white/20 shadow-sm">
         <div className="flex justify-between items-center max-w-[1280px] mx-auto px-4 md:px-10 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-[#4648d4] flex items-center justify-center">
-              <span className="text-white font-bold text-lg" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-9 w-auto" priority />
             <span className="font-bold text-xl tracking-tight text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8">
-            <Link className="text-[#45464d] font-medium text-sm hover:text-[#4648d4] transition-colors" href="/b2b">For Business</Link>
-            <Link className="text-[#4648d4] font-semibold text-sm" href="/b2c">For Individuals</Link>
-            <a className="text-[#45464d] font-medium text-sm hover:text-[#4648d4] transition-colors" href="#">Flash Deals</a>
+            <Link className="text-[#45464d] font-medium text-sm hover:text-[#4D8337] transition-colors" href="/b2b">For Business</Link>
+            <Link className="text-[#4D8337] font-semibold text-sm" href="/b2c">For Individuals</Link>
+            <a className="text-[#45464d] font-medium text-sm hover:text-[#4D8337] transition-colors" href="#">Flash Deals</a>
           </nav>
-          <Link href="/register?role=buyer" className="bg-[#4648d4] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:scale-105 transition-transform">
+          <Link href="/register?role=buyer" className="bg-[#4D8337] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#3E6D2E] hover:scale-105 transition-transform">
             Find Deals Free
           </Link>
         </div>
@@ -40,12 +39,12 @@ export default function B2CPage() {
         <section className="pt-32 pb-20 px-4">
           <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-12 items-center">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#6ffbbe]/40 text-[#005236] rounded-full text-xs font-bold tracking-widest mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#E0EDD8] text-[#315F23] rounded-full text-xs font-bold tracking-widest mb-6">
                 <Zap size={14} /> FOR INDIVIDUALS
               </div>
               <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6 tracking-tight" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
                 Stop Overpaying.<br />
-                <span className="text-[#4648d4]">Start Saving</span><br />
+                <span className="text-[#4D8337]">Start Saving</span><br />
                 on Everything.
               </h1>
               <p className="text-[#45464d] text-lg mb-8 max-w-xl">
@@ -61,14 +60,14 @@ export default function B2CPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
-                <Link href="/register?role=buyer" className="bg-[#4648d4] text-white px-6 py-3 rounded-xl font-bold text-sm hidden sm:block hover:bg-[#3a3cbf] transition-colors">
+                <Link href="/register?role=buyer" className="bg-[#4D8337] text-white px-6 py-3 rounded-xl font-bold text-sm hidden sm:block hover:bg-[#3E6D2E] transition-colors">
                   Track It
                 </Link>
               </div>
               <div className="flex flex-wrap gap-2 mb-10">
                 <span className="text-sm text-[#45464d] py-1">Popular:</span>
                 {["AirPods", "Standing Desk", "Laptop", "Office Chair"].map((tag) => (
-                  <span key={tag} className="px-3 py-1 bg-[#e6e8ea] rounded-full text-xs font-semibold text-[#45464d] hover:bg-[#4648d4]/10 hover:text-[#4648d4] transition-colors cursor-pointer">{tag}</span>
+                  <span key={tag} className="px-3 py-1 bg-[#e6e8ea] rounded-full text-xs font-semibold text-[#45464d] hover:bg-[#EFF7EA] hover:text-[#4D8337] transition-colors cursor-pointer">{tag}</span>
                 ))}
               </div>
 
@@ -82,7 +81,7 @@ export default function B2CPage() {
                   <div className="text-[#45464d] text-sm">Avg. Annual Savings</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <BadgeCheck size={20} className="text-[#4edea3]" />
+                  <BadgeCheck size={20} className="text-[#4D8337]" />
                   <div className="text-[#45464d] text-sm">Verified Deals</div>
                 </div>
               </div>
@@ -107,11 +106,11 @@ export default function B2CPage() {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { Icon: Bell, bg: "bg-[#4648d4]/10", color: "text-[#4648d4]", title: "Live Price Alerts", desc: "Set your target price and get notified instantly when any product drops to it. Never miss a deal." },
-                { Icon: BarChart3, bg: "bg-[#6ffbbe]/20", color: "text-[#005236]", title: "6-Month Price History", desc: "See how prices trend over time. Know if today's sale is a genuine deal or a fake discount." },
+                { Icon: Bell, bg: "bg-[#EFF7EA]", color: "text-[#4D8337]", title: "Live Price Alerts", desc: "Set your target price and get notified instantly when any product drops to it. Never miss a deal." },
+                { Icon: BarChart3, bg: "bg-[#E0EDD8]", color: "text-[#315F23]", title: "6-Month Price History", desc: "See how prices trend over time. Know if today's sale is a genuine deal or a fake discount." },
                 { Icon: TrendingDown, bg: "bg-[#131b2e]", color: "text-white", title: "Price Drop Predictions", desc: "Our AI forecasts when prices are likely to drop based on historical patterns and seasonal trends." },
-                { Icon: ShieldCheck, bg: "bg-[#4648d4]/10", color: "text-[#4648d4]", title: "Verified Deals", desc: "Every deal is cross-checked across multiple sources. No fake discounts or inflated list prices." },
-                { Icon: Star, bg: "bg-[#6ffbbe]/20", color: "text-[#005236]", title: "Wishlist Tracking", desc: "Save items to your wishlist and we'll automatically track prices and send alerts for you." },
+                { Icon: ShieldCheck, bg: "bg-[#EFF7EA]", color: "text-[#4D8337]", title: "Verified Deals", desc: "Every deal is cross-checked across multiple sources. No fake discounts or inflated list prices." },
+                { Icon: Star, bg: "bg-[#E0EDD8]", color: "text-[#315F23]", title: "Wishlist Tracking", desc: "Save items to your wishlist and we'll automatically track prices and send alerts for you." },
                 { Icon: Zap, bg: "bg-[#131b2e]", color: "text-white", title: "Flash Deals", desc: "Exclusive limited-time offers from verified sellers. First-come, first-served at below-market prices." },
               ].map(({ Icon, bg, color, title, desc }) => (
                 <div key={title} className="p-8 rounded-2xl shadow-sm border border-[#c6c6cd]/20 hover:shadow-xl hover:-translate-y-1 transition-all">
@@ -139,8 +138,8 @@ export default function B2CPage() {
                 { n: "3", Icon: TrendingDown, title: "Buy at the Right Time", desc: "See the full price history, buy with confidence, and never overpay again." },
               ].map(({ n, Icon, title, desc }) => (
                 <div key={n} className="text-center p-8 bg-white rounded-2xl shadow-sm border border-[#c6c6cd]/20">
-                  <div className="w-16 h-16 bg-[#4648d4] text-white rounded-full flex items-center justify-center font-bold text-2xl mx-auto mb-6" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{n}</div>
-                  <Icon size={28} className="text-[#4648d4] mx-auto mb-4" />
+                  <div className="w-16 h-16 bg-[#4D8337] text-white rounded-full flex items-center justify-center font-bold text-2xl mx-auto mb-6" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{n}</div>
+                  <Icon size={28} className="text-[#4D8337] mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-3" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>{title}</h3>
                   <p className="text-[#45464d] text-sm">{desc}</p>
                 </div>
@@ -159,7 +158,7 @@ export default function B2CPage() {
               Join thousands of smart shoppers who never overpay. Track your first product in under 30 seconds.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link href="/register?role=buyer" className="bg-[#4648d4] text-white px-10 py-5 rounded-2xl font-bold text-sm hover:scale-105 transition-transform">
+              <Link href="/register?role=buyer" className="bg-[#4D8337] text-white px-10 py-5 rounded-2xl font-bold text-sm hover:bg-[#3E6D2E] hover:scale-105 transition-transform">
                 Create Free Account
               </Link>
               <Link href="/" className="bg-white/10 text-white px-10 py-5 rounded-2xl font-bold text-sm hover:bg-white/20 transition-all border border-white/10">

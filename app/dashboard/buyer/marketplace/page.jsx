@@ -166,7 +166,7 @@ export default function MarketplacePage() {
       <div className="max-w-7xl mx-auto px-5 md:px-8 py-6">
 
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="flex-1 bg-white border border-[#e2ddd6] rounded-lg flex items-center focus-within:ring-2 focus-within:ring-[#4648d4]/20 transition-all">
+          <div className="flex-1 bg-white border border-[#e2ddd6] rounded-lg flex items-center focus-within:ring-2 focus-within:ring-[#84BA64]/25 focus-within:border-[#84BA64] transition-all">
             <Search size={15} className="mx-3 text-[#ccc] flex-shrink-0" />
             <input
               className="flex-1 text-sm py-2.5 outline-none text-[#111] placeholder:text-[#bbb]"
@@ -234,7 +234,7 @@ export default function MarketplacePage() {
           {(search || category || maxPrice < 500) && (
             <button
               onClick={() => { setSearch(""); setCategory(""); setMaxPrice(500); }}
-              className="text-xs text-[#4648d4] font-semibold hover:underline flex items-center gap-1"
+              className="text-xs text-[#4D8337] font-semibold hover:underline flex items-center gap-1"
             >
               <X size={11} /> Clear filters
             </button>
@@ -252,7 +252,7 @@ export default function MarketplacePage() {
             <p className="text-xs text-[#bbb] mb-4">Try adjusting your search or filters</p>
             <button
               onClick={() => { setSearch(""); setCategory(""); setMaxPrice(500); }}
-              className="text-xs font-semibold text-[#4648d4] hover:underline"
+              className="text-xs font-semibold text-[#4D8337] hover:underline"
             >
               Clear all filters
             </button>

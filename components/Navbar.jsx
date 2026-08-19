@@ -17,6 +17,7 @@ import { useCart } from "@/lib/cart-context";
 import { dashboardTabHref, normalizeRole, resolveUserRole } from "@/lib/auth";
 import { GrDashboard } from "react-icons/gr";
 import { getUserInitial } from "@/lib/utils";
+import BrandMark from "@/components/BrandMark";
 
 function formatNotifTime(iso) {
   if (!iso) return "";
@@ -254,19 +255,15 @@ export default function Navbar() {
 
  
             <Link href="/" className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3 group flex-shrink-0">
-              <div className="relative">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-lg bg-black flex items-center justify-center shadow-md shadow-black/20">
-                  <span className="text-white font-bold text-xs sm:text-sm md:text-lg tracking-tight">C</span>
-                </div>
-              </div>
+              <BrandMark className="h-7 w-auto sm:h-8 md:h-10" priority />
               <div className="flex items-baseline">
                 <span className="font-bold text-sm sm:text-base md:text-xl tracking-tight text-black truncate">
                   Cheaper
                 </span>
-                <span className="hidden xs:inline-block ml-1 text-[6px] sm:text-[7px] md:text-[8px] font-bold text-white bg-black px-1 sm:px-1.5 md:px-2 py-0.5 rounded-full">
+                <span className="hidden xs:inline-block ml-1 text-[6px] sm:text-[7px] md:text-[8px] font-bold text-white bg-[#4D8337] px-1 sm:px-1.5 md:px-2 py-0.5 rounded-full">
                   BETA
                 </span>
-                <TrendingUp size={10} className="hidden sm:inline-block ml-0.5 md:ml-1 text-green-500" />
+                <TrendingUp size={10} className="hidden sm:inline-block ml-0.5 md:ml-1 text-[#84BA64]" />
               </div>
             </Link>
 
@@ -278,16 +275,16 @@ export default function Navbar() {
                   href={href}
                   className={`relative px-2 xl:px-3 py-1.5 xl:py-2 text-xs xl:text-sm rounded-lg whitespace-nowrap ${
                     isActive(href)
-                      ? 'text-black bg-gray-100 font-semibold'
-                      : 'text-gray-500 hover:text-black hover:bg-gray-50 font-medium'
+                      ? 'text-[#315F23] bg-[#EFF7EA] font-semibold'
+                      : 'text-gray-500 hover:text-[#315F23] hover:bg-[#EFF7EA] font-medium'
                   }`}
                 >
                   <span className="flex items-center gap-1 xl:gap-1.5">
-                    <Icon size={14} className={isActive(href) ? 'text-black' : 'text-gray-400'} />
+                    <Icon size={14} className={isActive(href) ? 'text-[#4D8337]' : 'text-gray-400'} />
                     <span className="hidden xl:inline">{label}</span>
                   </span>
                   {isActive(href) && (
-                    <span className="absolute bottom-0 left-1/2 w-4 xl:w-6 h-0.5 bg-black -translate-x-1/2"></span>
+                    <span className="absolute bottom-0 left-1/2 w-4 xl:w-6 h-0.5 bg-[#84BA64] -translate-x-1/2"></span>
                   )}
                 </Link>
               ))}
@@ -296,7 +293,7 @@ export default function Navbar() {
       
             <div className="hidden xl:flex flex-1 max-w-xs 2xl:max-w-sm mx-4">
               <form onSubmit={handleSearch} className="w-full">
-                <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-[#84BA64] focus-within:ring-1 focus-within:ring-[#84BA64]">
                   <Search size={16} className="ml-3 text-gray-400 flex-shrink-0" />
                   <input
                     type="text"
@@ -307,7 +304,7 @@ export default function Navbar() {
                   />
                   <button 
                     type="submit"
-                    className="mr-1 px-3 py-1 bg-black text-white text-xs font-medium rounded-full hover:bg-gray-800 flex-shrink-0"
+                    className="mr-1 px-3 py-1 bg-[#4D8337] text-white text-xs font-medium rounded-full hover:bg-[#3E6D2E] flex-shrink-0"
                   >
                     Search
                   </button>

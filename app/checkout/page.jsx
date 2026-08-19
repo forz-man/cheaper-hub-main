@@ -10,6 +10,7 @@ import {
 import { useCart } from "@/lib/cart-context";
 import { requireAuth } from "@/lib/auth-flow";
 import useAuth from "@/hooks/useAuth";
+import BrandMark from "@/components/BrandMark";
 
 const COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Netherlands"];
 
@@ -120,9 +121,7 @@ export default function CheckoutPage() {
             <ArrowLeft size={16} /> Back
           </button>
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-[#111] flex items-center justify-center">
-              <span className="text-white font-bold text-xs" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>C</span>
-            </div>
+            <BrandMark className="h-7 w-auto" priority />
             <span className="font-bold text-sm" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Cheaper</span>
           </Link>
           <div className="flex items-center gap-1.5 text-xs text-[#aaa]">
@@ -201,7 +200,7 @@ export default function CheckoutPage() {
                       name="name"
                       value={form.name}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111]"
                       placeholder="Your full name"
                     />
                   </div>
@@ -212,7 +211,7 @@ export default function CheckoutPage() {
                       type="email"
                       value={form.email}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111]"
                       placeholder="you@example.com"
                     />
                   </div>
@@ -222,7 +221,7 @@ export default function CheckoutPage() {
                       name="address"
                       value={form.address}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111]"
                       placeholder="123 Main St, Apt 4B"
                     />
                   </div>
@@ -232,7 +231,7 @@ export default function CheckoutPage() {
                       name="city"
                       value={form.city}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111]"
                       placeholder="New York"
                     />
                   </div>
@@ -242,7 +241,7 @@ export default function CheckoutPage() {
                       name="zip"
                       value={form.zip}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111]"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111]"
                       placeholder="10001"
                     />
                   </div>
@@ -252,7 +251,7 @@ export default function CheckoutPage() {
                       name="country"
                       value={form.country}
                       onChange={handleChange}
-                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#4648d4]/20 focus:border-[#4648d4] text-[#111] bg-white"
+                      className="w-full border border-[#e2ddd6] rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#84BA64]/25 focus:border-[#4D8337] text-[#111] bg-white"
                     >
                       {COUNTRIES.map(c => <option key={c}>{c}</option>)}
                     </select>

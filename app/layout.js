@@ -21,6 +21,15 @@ export const metadata = {
   title: "Cheaper — Find Better Prices. Buy Smarter. Grow Faster.",
   description:
     "Compare products, suppliers, and wholesale offers from thousands of trusted businesses in one place.",
+  icons: {
+    icon: "/cheaper-icon.png",
+    shortcut: "/favicon.ico",
+    apple: "/cheaper-icon.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#84BA64",
 };
 
 export default function RootLayout({ children }) {

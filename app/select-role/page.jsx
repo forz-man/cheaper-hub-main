@@ -63,17 +63,17 @@ function SelectRoleContent() {
             type="button"
             onClick={() => handleSelect("buyer")}
             disabled={!!loading}
-            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#4648d4] hover:shadow-lg hover:shadow-[#4648d4]/10 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
+            className="w-full text-left rounded-2xl border-2 border-gray-200 bg-white p-6 transition-all hover:border-[#84BA64] hover:shadow-lg hover:shadow-[#84BA64]/20 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed group cursor-pointer"
           >
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-[#4648d4]/10 flex items-center justify-center text-2xl flex-shrink-0">
+              <div className="w-14 h-14 rounded-xl bg-[#EFF7EA] flex items-center justify-center text-2xl flex-shrink-0">
                 🛒
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-gray-900">Buyer</h3>
                   {loading === "buyer" && (
-                    <svg className="animate-spin h-5 w-5 text-[#4648d4]" viewBox="0 0 24 24" fill="none">
+                    <svg className="animate-spin h-5 w-5 text-[#4D8337]" viewBox="0 0 24 24" fill="none">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
@@ -85,7 +85,7 @@ function SelectRoleContent() {
             <ul className="mt-4 space-y-1.5">
               {["Compare supplier pricing", "Source products faster", "Track purchases"].map(f => (
                 <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-[#4648d4] font-bold">✓</span> {f}
+                  <span className="text-[#4D8337] font-bold">✓</span> {f}
                 </li>
               ))}
             </ul>

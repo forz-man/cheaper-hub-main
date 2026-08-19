@@ -13,7 +13,7 @@ import {
   FiMail, FiSend, FiShield, FiHeart, FiMapPin, 
   FiPhone, FiClock, FiZap
 } from 'react-icons/fi';
-import { BsSignNoParkingFill } from 'react-icons/bs';
+import BrandMark from "@/components/BrandMark";
 
 
 const Footer = () => {
@@ -22,7 +22,6 @@ const Footer = () => {
 
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   const handleSubscribe = (e) => {
     e.preventDefault();
@@ -92,18 +91,8 @@ const Footer = () => {
             <Link 
               href="/" 
               className="flex items-center gap-2 group"
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
             >
-              <div className="relative">
-                <div className={`absolute inset-0 bg-black rounded-lg blur-xl transition-opacity duration-500 ${isHovered ? 'opacity-20' : 'opacity-5'}`}></div>
-                <div className="relative w-9 h-9 rounded-lg bg-black flex items-center justify-center shadow-lg shadow-black/20 group-hover:shadow-black/40 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
-                  <span className="text-white font-bold text-base">C</span>
-                  {isHovered && (
-                    <BsSignNoParkingFill size={10} className="absolute -top-1 -right-1 text-yellow-400 animate-pulse" />
-                  )}
-                </div>
-              </div>
+              <BrandMark className="h-9 w-auto transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3" />
               <span className="font-bold text-lg tracking-tight text-[#0a0a0a]">
                 Cheaper
               </span>
