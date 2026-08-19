@@ -81,7 +81,9 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-black mb-0.5">Email us</p>
-                <p className="text-xs text-gray-400">support@cheaper.app</p>
+                <a href="mailto:support@cheaper.com" className="text-xs text-gray-400 hover:text-black transition-colors">
+                  support@cheaper.com
+                </a>
               </div>
             </div>
 
@@ -91,7 +93,10 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-black mb-0.5">Call us</p>
-                <p className="text-xs text-gray-400">Mon–Fri, 9am–6pm ET</p>
+                <a href="tel:+12012943738" className="block text-xs text-gray-400 hover:text-black transition-colors">
+                  +1 201 294 3738
+                </a>
+                <p className="text-xs text-gray-400 mt-0.5">Mon–Fri, 9am–6pm ET</p>
               </div>
             </div>
 

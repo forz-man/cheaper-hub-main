@@ -116,11 +116,11 @@ const Footer = () => {
             <div className="mt-4 space-y-2">
               <div className="flex items-center gap-2.5 text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300 group">
                 <FiMail size={14} className="text-gray-400 flex-shrink-0 group-hover:text-gray-800 transition-colors" />
-                <span>support@cheaper.com</span>
+                <a href="mailto:support@cheaper.com">support@cheaper.com</a>
               </div>
               <div className="flex items-center gap-2.5 text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300 group">
                 <FiPhone size={14} className="text-gray-400 flex-shrink-0 group-hover:text-gray-800 transition-colors" />
-                <span>+1 (555) 123-4567</span>
+                <a href="tel:+12012943738">+1 201 294 3738</a>
               </div>
               <div className="flex items-center gap-2.5 text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300 group">
                 <FiMapPin size={14} className="text-gray-400 flex-shrink-0 group-hover:text-gray-800 transition-colors" />
