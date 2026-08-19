@@ -66,11 +66,6 @@ const Footer = () => {
       // { label: "Success Stories", href: "#" },
       // { label: "Press Kit", href: "#" },
     ],
-    "Legal": [
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Cookie Policy", href: "/cookies" },
-    ],
   };
 
   const socialLinks = [
