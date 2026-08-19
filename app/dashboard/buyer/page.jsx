@@ -351,8 +351,8 @@ export default function BuyerDashboard() {
       <div className="container py-8">
 
         {/* Page header */}
-        <motion.div className="mb-6 flex items-start justify-between" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <div>
+        <motion.div className="mb-6 flex flex-wrap items-start justify-between gap-3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div className="min-w-0">
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 bg-black rounded-xl">
                 <LayoutDashboard size={20} className="text-white" />
@@ -383,6 +383,8 @@ export default function BuyerDashboard() {
           {activeTab === "overview" && (
             <motion.div key="overview" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <motion.div variants={innerStagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <motion.div key="overview" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+              <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: "Orders placed", value: ordersLoading ? "…" : String(orders.length), sub: "All time", Icon: ShoppingBag },
                   { label: "Items delivered", value: ordersLoading ? "…" : String(deliveredCount), sub: "Completed", Icon: CheckCircle },

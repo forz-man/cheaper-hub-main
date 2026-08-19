@@ -258,17 +258,17 @@ export default function Navbar() {
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
       >
         <div className="container">
-          <div className="flex items-center justify-between h-14 sm:h-16 md:h-[72px]">
+          <div className="flex min-w-0 items-center justify-between h-14 sm:h-16 md:h-[72px]">
 
  
-            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 md:gap-3 group flex-shrink-0">
+            <Link href="/" className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3 group flex-shrink-0">
               <div className="relative">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-lg bg-black flex items-center justify-center shadow-md shadow-black/20">
                   <span className="text-white font-bold text-xs sm:text-sm md:text-lg tracking-tight">C</span>
                 </div>
               </div>
               <div className="flex items-baseline">
-                <span className="font-bold text-sm sm:text-base md:text-xl tracking-tight text-black">
+                <span className="font-bold text-sm sm:text-base md:text-xl tracking-tight text-black truncate">
                   Cheaper
                 </span>
                 <span className="hidden xs:inline-block ml-1 text-[6px] sm:text-[7px] md:text-[8px] font-bold text-white bg-black px-1 sm:px-1.5 md:px-2 py-0.5 rounded-full">
@@ -346,7 +346,7 @@ export default function Navbar() {
             </div>
 
       
-            <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
+            <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-1 md:gap-1.5 xl:gap-2">
 
               {showAuthControls ? (
                 <>
@@ -555,6 +555,20 @@ export default function Navbar() {
                                     {profile?.email || user?.email}
                                   </p>
                                 </div>
+                    {showDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)}></div>
+                        <div className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-1rem))] bg-white border border-gray-200 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden">
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-black"></div>
+
+                          <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-black text-white flex items-center justify-center border border-gray-200">
+                                {avatarUrl ? (
+                                  <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover rounded-full" />
+                                ) : (
+                                  <span>{displayInitial}</span>
+                                )}
                               </div>
                               <div className="mt-1.5 sm:mt-2 flex items-center gap-1">
                                 <AwardIcon size={10} className="text-yellow-500" />
@@ -608,11 +622,11 @@ export default function Navbar() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center gap-3">
-                  <Link className="text-sm font-medium hover:text-gray-600 px-3 py-2" href="/login">
+                <div className="flex items-center gap-1 sm:gap-3">
+                  <Link className="text-xs sm:text-sm font-medium hover:text-gray-600 px-2 sm:px-3 py-2 whitespace-nowrap" href="/login">
                     Sign in
                   </Link>
-                  <Link className="bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition" href="/select-role">
+                  <Link className="bg-black text-white px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-800 transition whitespace-nowrap" href="/select-role">
                     Get started
                   </Link>
                 </div>

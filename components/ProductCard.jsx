@@ -246,8 +246,8 @@ const ProductCard = ({ product }) => {
           <span className="text-gray-300 text-xs">({reviews})</span>
         </div>
         
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-1 mb-3">
+          <div className="flex min-w-0 items-baseline gap-2">
             <span className="font-bold text-black text-lg">${product.price}</span>
             {product.original_price && product.original_price > product.price && (
               <span className="text-gray-300 text-xs line-through">${product.original_price}</span>
@@ -255,10 +255,11 @@ const ProductCard = ({ product }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           <motion.button 
             onClick={handleAddToCart}
             className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`min-w-0 flex-1 py-2.5 text-xs font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
               isAddedToCart 
                 ? 'bg-green-600 text-white' 
                 : 'bg-black text-white hover:bg-gray-800'
@@ -288,6 +289,9 @@ const ProductCard = ({ product }) => {
             whileHover={shouldReduceMotion ? {} : { scale: 1.04 }} 
             whileTap={{ scale: 0.96 }}
             transition={{ type: "spring", stiffness: 350, damping: 15 }}
+          <Link
+            href={`/products/${product.id}`}
+            className="min-w-0 flex-1 sm:flex-none px-3 sm:px-5 py-2.5 text-xs font-semibold text-black border border-gray-300 rounded-xl hover:border-black hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-1.5 group"
           >
             <Link
               href={`/products/${product.id}`}

@@ -35,8 +35,8 @@ export default function B2BPage() {
 
         {/* ── Hero ── */}
         <section className="pt-32 pb-20 px-4">
-          <div className="max-w-[1280px] mx-auto grid lg:grid-cols-2 gap-12 items-center">
-            <div>
+          <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-12 items-center">
+            <div className="min-w-0">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#4648d4]/10 text-[#4648d4] rounded-full text-xs font-bold tracking-widest mb-6">
                 <Building2 size={14} /> BUSINESS SOLUTIONS
               </div>
@@ -66,7 +66,7 @@ export default function B2BPage() {
             </div>
             <div className="rounded-3xl overflow-hidden shadow-2xl">
               <img
-                className="w-full h-[420px] object-cover"
+                className="w-full h-[280px] sm:h-[360px] lg:h-[420px] object-cover"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVeFs_nafYFfCc8HWl4kuK_KKC2FBX0ZZy4YSACfiQXPSPckOFov2_aMqeAnTd8CgKXF7Rm9JPJhgXWNXAvbkUWNYRcXE_ERoLSsRiDurnn0H6D-pYig-pIa7iKLAfAYdNEJYnbDhlyQfFVlkUVvYq1B_m_SbqMjKD4_Jou6D89MTKVsX1neJOahOuBXMPOjxshmXHhDIMiwphJDDKy5EkDK3Tea4ycWEq70mgc2oKsrbAwErumUuxsXQ0Yf7-y0BAMfNpf2feaSzH"
                 alt="Industrial warehouse procurement"
               />
@@ -104,8 +104,8 @@ export default function B2BPage() {
 
         {/* ── Checklist ── */}
         <section className="py-24 px-4">
-          <div className="max-w-[1280px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
-            <div>
+          <div className="max-w-[1280px] mx-auto grid min-w-0 lg:grid-cols-2 gap-16 items-center">
+            <div className="min-w-0">
               <div className="inline-block px-4 py-1 bg-[#4648d4]/10 text-[#4648d4] rounded-full text-xs font-bold tracking-widest mb-6">WHY CHEAPER B2B</div>
               <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Everything Your Procurement Team Needs</h2>
               <ul className="space-y-5">
@@ -127,7 +127,7 @@ export default function B2BPage() {
                 Access B2B Portal <ArrowRight size={16} />
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 { val: "48hr", label: "Average RFQ turnaround" },
                 { val: "500+", label: "Verified global suppliers" },
@@ -145,7 +145,7 @@ export default function B2BPage() {
 
         {/* ── CTA ── */}
         <section className="py-20 px-4">
-          <div className="max-w-[1280px] mx-auto bg-[#131b2e] rounded-[2rem] p-12 md:p-20 text-center">
+          <div className="max-w-[1280px] mx-auto bg-[#131b2e] rounded-[2rem] p-6 sm:p-10 md:p-20 text-center">
             <h2 className="text-white text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
               Ready to Optimize Your Procurement?
             </h2>

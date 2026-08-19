@@ -297,7 +297,7 @@ function MessagesPageInner() {
       <div className="container py-6">
 
         {/* Page title row */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-2xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
               Messages
@@ -311,13 +311,13 @@ function MessagesPageInner() {
         </div>
 
         {/* Split-pane container */}
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
+        <div className="min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
           style={{ height: "calc(100vh - 180px)", minHeight: 520 }}>
           <div className="flex h-full">
 
             {/* ── Conversation list ─────────────────────────────────────────── */}
             {(showList || !isMobile) && (
-              <div className={`${isMobile ? "w-full" : "w-[320px] min-w-[280px]"} border-r border-gray-100 flex flex-col bg-white`}>
+              <div className={`${isMobile ? "w-full" : "w-full sm:w-[280px] lg:w-[320px]"} min-w-0 border-r border-gray-100 flex flex-col bg-white`}>
 
                 {/* Search */}
                 <div className="p-4 border-b border-gray-100">
@@ -607,12 +607,12 @@ function MessageBubble({ msg, isOwn }) {
       transition={{ duration: 0.18, ease: "easeOut" }}
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-1`}
     >
-      <div className={`max-w-[72%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
+      <div className={`max-w-[72%] min-w-0 flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
         <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
           isOwn
             ? "bg-black text-white rounded-br-sm"
             : "bg-white text-black border border-gray-200 rounded-bl-sm shadow-sm"
-        }`}>
+          } break-words [overflow-wrap:anywhere]`}>
           {msg.message}
         </div>
         <div className="flex items-center gap-1 mt-1 px-1">

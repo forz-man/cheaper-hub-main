@@ -182,14 +182,14 @@ function RegisterForm() {
 
           <PasswordStrength password={password} />
 
-          <label className="flex items-start gap-3 text-sm text-[#888] cursor-pointer pt-1">
+          <label className="flex min-w-0 items-start gap-3 text-sm text-[#888] cursor-pointer pt-1">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded accent-[#111]"
             />
-            <span>
+            <span className="min-w-0 break-words">
               I agree to Cheaper&apos;s{" "}
               <Link href="#" className="font-semibold text-[#111] hover:underline">Terms</Link>{" "}
               and{" "}

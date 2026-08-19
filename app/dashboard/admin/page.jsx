@@ -195,7 +195,7 @@ function OverviewSection() {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((c) => <StatCardMemo key={c.label} {...c} />)}
     </div>
   );
@@ -326,7 +326,7 @@ function ProductsSection({ tab }) {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder={`Search ${approvalTabLabel} products...`} />
         {approvalStatus === "approved" && (
           <p className="text-xs text-gray-400 max-w-xs">
@@ -357,7 +357,7 @@ function ProductsSection({ tab }) {
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</th>
@@ -560,7 +560,7 @@ function OrdersSection({ filter }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[680px] text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Order</th>
@@ -742,7 +742,7 @@ function UsersSection({ filter }) {
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
@@ -915,7 +915,7 @@ function VendorsSection() {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[680px] text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Store</th>
@@ -1179,7 +1179,7 @@ function ActivityLogSection() {
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Admin</th>
@@ -1537,12 +1537,12 @@ export default function AdminDashboard() {
 
       <main className="flex-1 min-w-0">
         <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-          <div className="flex items-center justify-between px-4 lg:px-8 py-3">
+          <div className="flex min-w-0 items-center justify-between px-4 lg:px-8 py-3">
             <div className="flex items-center gap-3">
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100">
                 <Menu size={18} />
               </button>
-              <h1 className="text-lg font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
+              <h1 className="min-w-0 truncate text-lg font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
                 {getCurrentLabel()}
               </h1>
             </div>
@@ -1557,7 +1557,7 @@ export default function AdminDashboard() {
                 <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center text-white text-[10px] font-bold">
                   {user?.email?.[0] || "A"}
                 </div>
-                <span className="hidden sm:block text-xs font-medium text-gray-600">{user?.email}</span>
+                <span className="hidden max-w-[180px] truncate sm:block text-xs font-medium text-gray-600">{user?.email}</span>
               </div>
             </div>
           </div>

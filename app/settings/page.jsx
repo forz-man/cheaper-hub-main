@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import useProfile from "@/hooks/useProfile";
 import { 
-  User, Store, Mail, Shield, Bell, Save, CheckCircle2, ChevronRight, Settings as SettingsIcon 
+  User, Store, Mail, Shield, Bell, Save, CheckCircle2, ChevronRight, Settings as SettingsIcon, Lock
 } from "lucide-react";
 import Link from "next/link";
 
@@ -20,6 +20,18 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Email change state
+  const [newEmail, setNewEmail] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({ password: "", confirm: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     if (profile) {
       setForm({
@@ -31,6 +43,64 @@ export default function SettingsPage() {
       });
     }
   }, [profile]);
+
+  const handleEmailChange = async (e) => {
+    e.preventDefault();
+    setEmailError("");
+    setEmailSuccess(false);
+    setEmailSaving(true);
+    try {
+      const res = await fetch("/api/auth/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailError(data.error || "Something went wrong. Please try again.");
+      } else {
+        setEmailSuccess(true);
+        setNewEmail("");
+      }
+    } catch {
+      setEmailError("Unable to connect. Please try again.");
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess(false);
+    if (passwordForm.password !== passwordForm.confirm) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+    if (passwordForm.password.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordForm.password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordError(data.error || "Something went wrong. Please try again.");
+      } else {
+        setPasswordSuccess(true);
+        setPasswordForm({ password: "", confirm: "" });
+      }
+    } catch {
+      setPasswordError("Unable to connect. Please try again.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
@@ -188,17 +258,121 @@ export default function SettingsPage() {
               )}
 
               {activeSection === "security" && (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <h3 className="text-base font-bold text-black border-b border-gray-100 pb-3" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>Login & Security</h3>
+
+                  {/* Change Email */}
                   <div className="space-y-4">
-                    <p className="text-xs text-gray-400">Security configuration and credential management is integrated through Supabase authentication.</p>
-                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
-                      <span className="text-xs font-bold text-black">Reset password link</span>
-                      <p className="text-[11px] text-gray-400">If you wish to change your login credentials, request a password reset email link.</p>
-                      <Link href="/forgot-password" className="inline-block mt-1 text-xs font-bold text-black underline">
-                        Request reset email
-                      </Link>
+                    <div className="flex items-center gap-2">
+                      <Mail size={15} className="text-gray-400" />
+                      <span className="text-sm font-bold text-black">Change Email Address</span>
                     </div>
+                    <p className="text-[11px] text-gray-400 -mt-2">
+                      A confirmation link will be sent to your new address before the change takes effect. Both your old and new addresses will receive a security notification.
+                    </p>
+
+                    {emailSuccess && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-2.5 text-emerald-800 text-xs font-semibold">
+                        <CheckCircle2 size={15} className="text-emerald-500" />
+                        Confirmation email sent — check your inbox to complete the change.
+                      </div>
+                    )}
+                    {emailError && (
+                      <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-xs text-red-600 font-semibold">
+                        {emailError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleEmailChange} className="flex gap-3 items-end">
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-500">New Email Address</label>
+                        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                          <Mail size={14} className="text-gray-400 shrink-0" />
+                          <input
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            required
+                            placeholder="new@example.com"
+                            className="bg-transparent text-xs text-black w-full outline-none font-medium"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={emailSaving || !newEmail}
+                        className="bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                      >
+                        <Save size={13} />
+                        {emailSaving ? "Sending…" : "Update Email"}
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Change Password */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Lock size={15} className="text-gray-400" />
+                      <span className="text-sm font-bold text-black">Change Password</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 -mt-2">
+                      You will receive a security email once your password is updated.
+                    </p>
+
+                    {passwordSuccess && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-2.5 text-emerald-800 text-xs font-semibold">
+                        <CheckCircle2 size={15} className="text-emerald-500" />
+                        Password updated successfully.
+                      </div>
+                    )}
+                    {passwordError && (
+                      <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-xs text-red-600 font-semibold">
+                        {passwordError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handlePasswordChange} className="grid sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-500">New Password</label>
+                        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                          <Lock size={14} className="text-gray-400 shrink-0" />
+                          <input
+                            type="password"
+                            value={passwordForm.password}
+                            onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                            required
+                            placeholder="Min. 6 characters"
+                            className="bg-transparent text-xs text-black w-full outline-none font-medium"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-500">Confirm New Password</label>
+                        <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                          <Lock size={14} className="text-gray-400 shrink-0" />
+                          <input
+                            type="password"
+                            value={passwordForm.confirm}
+                            onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                            required
+                            placeholder="Repeat password"
+                            className="bg-transparent text-xs text-black w-full outline-none font-medium"
+                          />
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2 flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={passwordSaving || !passwordForm.password || !passwordForm.confirm}
+                          className="bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Save size={13} />
+                          {passwordSaving ? "Updating…" : "Update Password"}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               )}

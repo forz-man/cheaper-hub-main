@@ -714,8 +714,8 @@ export default function VendorDashboard() {
       <div className="container py-8">
 
         {/* Page header */}
-        <motion.div className="mb-6 flex items-start justify-between" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <div>
+        <motion.div className="mb-6 flex flex-wrap items-start justify-between gap-3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div className="min-w-0">
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 bg-black rounded-xl">
                 <LayoutDashboard size={20} className="text-white" />
@@ -765,6 +765,7 @@ export default function VendorDashboard() {
               </div>
 
               <motion.div variants={innerStagger} initial="hidden" animate="visible" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: "Total products", value: productsLoading ? "…" : String(products.length), sub: "Live listings", Icon: Package },
                   { label: "Total orders", value: ordersLoading ? "…" : String(orderItems.length), sub: "Order items", Icon: ShoppingBag },
@@ -835,6 +836,8 @@ export default function VendorDashboard() {
           {activeTab === "products" && (
             <motion.div key="products" variants={innerTabVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex items-center justify-between mb-6">
+            <motion.div key="products" variants={tabVariants} initial="hidden" animate="visible" exit="exit">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <p className="text-sm text-gray-400">
                   <span className="font-semibold text-black">{products.length}</span> {products.length === 1 ? "product" : "products"}
                 </p>
@@ -887,7 +890,8 @@ export default function VendorDashboard() {
                 </motion.div>
               ) : (
                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/50">
                         <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Product</th>
@@ -949,6 +953,7 @@ export default function VendorDashboard() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 
@@ -986,7 +991,8 @@ export default function VendorDashboard() {
               )}
 
               <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/50">
                       <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Order</th>
@@ -1050,6 +1056,7 @@ export default function VendorDashboard() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1113,7 +1120,7 @@ export default function VendorDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white border border-gray-200 rounded-2xl p-5">
                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Held by platform</div>
                     <div className="text-xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
@@ -1214,7 +1221,7 @@ export default function VendorDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-500 block mb-1.5">Price ($) <span className="text-red-400">*</span></label>
                   <input
@@ -1243,7 +1250,7 @@ export default function VendorDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-500 block mb-1.5">Stock qty</label>
                   <input
@@ -1406,7 +1413,8 @@ export default function VendorDashboard() {
                   </div>
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
                     <div className="max-h-52 overflow-y-auto">
-                      <table className="w-full text-xs">
+                      <div className="overflow-x-auto">
+                      <table className="w-full min-w-[520px] text-xs">
                         <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                           <tr>
                             <th className="px-3 py-2 text-left font-semibold text-gray-400">Row</th>
@@ -1426,6 +1434,7 @@ export default function VendorDashboard() {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   </div>
                 </div>

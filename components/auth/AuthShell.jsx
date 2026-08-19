@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function AuthShell({ children }) {
   return (
-    <main className="min-h-screen bg-[#f5f3ef] flex items-center justify-center px-4 py-8" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+    <main className="min-h-screen overflow-y-auto bg-[#f5f3ef] flex items-start sm:items-center justify-center px-4 py-6 sm:py-8" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
       <div className="w-full max-w-5xl bg-white rounded-2xl border border-[#e2ddd6] shadow-sm overflow-hidden grid lg:grid-cols-2">
 
         {/* Left panel */}

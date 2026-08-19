@@ -35,10 +35,24 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background-color: #f7f9fb;
   color: #191c1e;
   font-family: var(--font-sans);
+  min-width: 320px;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 .container {

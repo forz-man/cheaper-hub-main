@@ -191,10 +191,10 @@ export default function CheckoutPage() {
             </div>
 
             {/* Shipping address */}
-            <div className="bg-white border border-[#e2ddd6] rounded-2xl p-6">
+            <div className="bg-white border border-[#e2ddd6] rounded-2xl p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-[#111] mb-5">Shipping address</h2>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="text-xs font-semibold text-[#555] block mb-1.5">Full name</label>
                     <input
@@ -262,7 +262,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Payment */}
-            <div className="bg-white border border-[#e2ddd6] rounded-2xl p-6">
+              <div className="bg-white border border-[#e2ddd6] rounded-2xl p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-[#111] mb-4 flex items-center gap-2">
                 <CreditCard size={15} className="text-[#888]" /> Payment method
               </h2>
@@ -277,8 +277,8 @@ export default function CheckoutPage() {
                     You&apos;ll enter your card details on Stripe&apos;s secure checkout page. Your card is charged immediately, but payment is held by us until delivery is confirmed.
                   </p>
                   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 space-y-1">
-                    <div className="flex items-start gap-1.5"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Money held with Cheaper until both you and the seller confirm delivery</div>
-                    <div className="flex items-start gap-1.5"><Shield size={10} className="mt-0.5 flex-shrink-0" /> Card data never touches our servers — secured by Stripe</div>
+                    <div className="flex items-start gap-1.5 break-words"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Money held with Cheaper until both you and the seller confirm delivery</div>
+                    <div className="flex items-start gap-1.5 break-words"><Shield size={10} className="mt-0.5 flex-shrink-0" /> Card data never touches our servers — secured by Stripe</div>
                   </div>
               </div>
             </div>
@@ -292,8 +292,8 @@ export default function CheckoutPage() {
 
               <div className="space-y-3 text-sm mb-5">
                 {items.map(item => (
-                  <div key={item.id} className="flex justify-between text-[#555]">
-                    <span className="truncate mr-2">{item.name} × {item.qty}</span>
+                   <div key={item.id} className="flex min-w-0 justify-between text-[#555]">
+                     <span className="min-w-0 truncate mr-2">{item.name} × {item.qty}</span>
                     <span className="font-medium text-[#111] flex-shrink-0">${(item.price * item.qty).toFixed(2)}</span>
                   </div>
                 ))}
@@ -344,7 +344,7 @@ export default function CheckoutPage() {
                 )}
               </button>
 
-              <div className="flex items-center justify-center gap-4 mt-5 pt-5 border-t border-[#f0ede8]">
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mt-5 pt-5 border-t border-[#f0ede8]">
                 {[
                   { Icon: Shield, label: "Buyer protection" },
                   { Icon: Truck, label: "Fast delivery" },
