@@ -58,13 +58,18 @@ const Footer = () => {
       { label: "Help Center", href: "/contact" },
       { label: "Contact Us", href: "/contact" },
       { label: "FAQ", href: "/faq" },
-      { label: "Returns Policy", href: "/contact" },
+       { label: "Returns Policy", href: "/returns" },
     ],
     "Company": [
       { label: "Sustainability", href: "/sustainability" },
       { label: "Careers", href: "/careers" },
       // { label: "Success Stories", href: "#" },
       // { label: "Press Kit", href: "#" },
+    ],
+    "Legal": [
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Cookie Policy", href: "/cookies" },
     ],
   };
 
