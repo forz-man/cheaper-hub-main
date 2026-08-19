@@ -12,7 +12,8 @@ function isSuppressed(pathname) {
   return (
     pathname === "/checkout" ||
     pathname === "/order-success" ||
-    pathname.startsWith("/order-success/")
+    pathname.startsWith("/order-success/") ||
+    pathname.startsWith("/dashboard/admin")
   );
 }
 

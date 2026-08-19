@@ -3,7 +3,7 @@ import { ArrowLeft, Mail } from "lucide-react";
 
 export default function PolicyPage({ eyebrow, title, intro, sections }) {
   return (
-    <main className="min-h-screen bg-[#faf9f7] px-4 py-16 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#faf9f7] px-4 pb-16 pt-20 sm:px-6 sm:pt-24 md:pt-28 lg:px-8">
       <article className="mx-auto max-w-4xl">
         <Link
           href="/"

@@ -140,7 +140,7 @@ export default function CareersPage() {
   }, [searchQuery, activeCategory]);
 
   return (
-    <div className="min-h-screen bg-[#fcfbfa] pb-24">
+    <div className="min-h-screen bg-[#fcfbfa] pb-24 pt-14 sm:pt-16 md:pt-[72px]">
       {/* Hero Banner */}
       <div className="relative bg-black text-white py-20 sm:py-28 overflow-hidden border-b border-[#222]">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-blue-300 via-indigo-600 to-purple-800 blur-3xl"></div>

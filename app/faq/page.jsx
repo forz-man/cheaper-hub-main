@@ -106,7 +106,7 @@ export default function FAQPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fcfbfa] pb-20">
+    <div className="min-h-screen bg-[#fcfbfa] pb-20 pt-14 sm:pt-16 md:pt-[72px]">
       {/* Premium Hero Section */}
       <div className="relative bg-black text-white overflow-hidden py-16 sm:py-24 border-b border-[#222]">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-yellow-100 via-yellow-200 to-amber-500 blur-3xl"></div>
