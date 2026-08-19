@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { normalizeRole, resolveUserRole, destinationForRole } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabaseAdmin";
 
 function isSafeReturnTo(value) {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
@@ -137,7 +138,7 @@ export async function GET(request) {
       if (updateError) throw updateError;
 
       role = pendingRole;
-      const { error: profileError } = await supabase
+      const { error: profileError } = await createAdminClient()
         .from("profiles")
         .upsert({ id: user.id, role: pendingRole }, { onConflict: "id" });
       if (profileError) {

@@ -28,10 +28,10 @@ export async function POST(request) {
         authUser.email?.split("@")[0] ||
         "Buyer";
       try {
-        await supabase.from("profiles").upsert(
-          { id: buyer_id, full_name: displayName, email: authUser.email },
-          { onConflict: "id", ignoreDuplicates: false }
-        );
+        await supabase
+          .from("profiles")
+          .update({ full_name: displayName })
+          .eq("id", buyer_id);
       } catch (_) { /* profiles table may not exist yet — non-fatal */ }
     }
 

@@ -236,8 +236,6 @@ export default function VendorProfilePage() {
       }
 
       const cleanPayload = {
-        id: user.id, // Primary key
-        email: user?.email || profile?.email || profile?.emailAddress || '',
         full_name: editForm.full_name || editForm.fullName || '',
         store_name: editForm.store_name || editForm.storeName || '',
         phone_number: editForm.phone_number || editForm.phoneNumber || '',
@@ -251,7 +249,8 @@ export default function VendorProfilePage() {
 
       const { data, error: saveErr } = await supabase
         .from('profiles')
-        .upsert(cleanPayload, { onConflict: 'id' })
+        .update(cleanPayload)
+        .eq('id', user.id)
         .select()
         .single();
 

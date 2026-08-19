@@ -174,6 +174,29 @@ function relativeTime(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function syncSummary(counts = {}, warnings = []) {
+  const parts = [
+    ["created", "created"],
+    ["updated", "updated"],
+    ["unchanged", "unchanged"],
+    ["archived", "archived"],
+    ["failed", "failed"],
+  ]
+    .filter(([key]) => Number(counts[key] || 0) > 0)
+    .map(([key, label]) => `${counts[key]} ${label}`);
+  if (warnings.length) parts.push(`${warnings.length} warning${warnings.length === 1 ? "" : "s"}`);
+  return parts.length ? parts.join(" · ") : "No product changes";
+}
+
+function syncIssueText(issue) {
+  if (typeof issue === "string") return issue;
+  const identity = issue?.externalId ? `Product ${issue.externalId}` : `Row ${(issue?.index ?? 0) + 1}`;
+  const details = Array.isArray(issue?.errors)
+    ? issue.errors.join(" ")
+    : issue?.message || "Could not be imported.";
+  return `${identity}: ${details}`;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function IntegrationsTab({ onAddProduct }) {
@@ -187,12 +210,12 @@ export default function IntegrationsTab({ onAddProduct }) {
   const [showExtra, setShowExtra]             = useState(false);
   const [connectStep, setConnectStep]         = useState("idle"); // idle | connecting | syncing | done | error
   const [connectError, setConnectError]       = useState(null);
-  const [syncResult, setSyncResult]           = useState(null); // { imported, total }
+  const [syncResult, setSyncResult]           = useState(null);
 
   // Per-connection sync state
   const [syncing, setSyncing]                 = useState({}); // { [connectionId]: bool }
   const [syncErrors, setSyncErrors]           = useState({}); // { [connectionId]: string }
-  const [syncResults, setSyncResults]         = useState({}); // { [connectionId]: { imported, total } }
+  const [syncResults, setSyncResults]         = useState({});
 
   // Disconnect
   const [disconnecting, setDisconnecting]     = useState({}); // { [connectionId]: bool }
@@ -207,6 +230,33 @@ export default function IntegrationsTab({ onAddProduct }) {
   }, []);
 
   useEffect(() => { loadConnections(); }, [loadConnections]);
+
+  const processSyncJob = async (jobId, onProgress) => {
+    for (let page = 0; page < 2000; page += 1) {
+      const res = await fetch(`/api/integrations/sync/${jobId}`, { method: "POST" });
+      const data = await res.json();
+      if (res.status === 409) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+        continue;
+      }
+      if (!res.ok) throw new Error(data.message || data.error_message || "Sync failed");
+      onProgress?.(data);
+      if (data.status === "completed" || data.status === "partial") return data;
+    }
+    throw new Error("The catalog is too large to finish in one dashboard session. You can resume it from this page.");
+  };
+
+  const startSyncJob = async (connectionId, onProgress) => {
+    const startRes = await fetch("/api/integrations/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ connection_id: connectionId }),
+    });
+    const started = await startRes.json();
+    if (!startRes.ok) throw new Error(started.message || "Sync could not be started");
+    onProgress?.(started);
+    return processSyncJob(started.job_id, onProgress);
+  };
 
   // ── Open connect modal ───────────────────────────────────────────────────────
   const openModal = (platform) => {
@@ -249,17 +299,10 @@ export default function IntegrationsTab({ onAddProduct }) {
       const data = await res.json();
       if (!res.ok) { setConnectStep("error"); setConnectError(data.message || "Failed to connect"); return; }
 
-      // Connection saved — now sync
+      // Connection saved — now run its resumable sync job.
       setConnectStep("syncing");
-      const syncRes = await fetch("/api/integrations/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connection_id: data.id }),
-      });
-      const syncData = await syncRes.json();
-      if (!syncRes.ok) { setConnectStep("error"); setConnectError(syncData.message || "Connected but sync failed"); return; }
-
-      setSyncResult({ imported: syncData.imported, total: syncData.total });
+      const syncData = await startSyncJob(data.id, setSyncResult);
+      setSyncResult(syncData);
       setConnectStep("done");
       await loadConnections();
     } catch (e) {
@@ -275,18 +318,11 @@ export default function IntegrationsTab({ onAddProduct }) {
     setSyncResults(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
 
     try {
-      const res = await fetch("/api/integrations/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connection_id: conn.id }),
+      const data = await startSyncJob(conn.id, (progress) => {
+        setSyncResults(prev => ({ ...prev, [conn.id]: progress }));
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setSyncErrors(prev => ({ ...prev, [conn.id]: data.message || "Sync failed" }));
-      } else {
-        setSyncResults(prev => ({ ...prev, [conn.id]: { imported: data.imported, total: data.total } }));
-        await loadConnections();
-      }
+      setSyncResults(prev => ({ ...prev, [conn.id]: data }));
+      await loadConnections();
     } catch (e) {
       setSyncErrors(prev => ({ ...prev, [conn.id]: e.message || "Network error" }));
     } finally {
@@ -296,7 +332,7 @@ export default function IntegrationsTab({ onAddProduct }) {
 
   // ── Disconnect ───────────────────────────────────────────────────────────────
   const handleDisconnect = async (conn) => {
-    if (!confirm(`Disconnect ${conn.platform}? This won't remove already-synced products.`)) return;
+    if (!confirm(`Disconnect ${conn.platform}? Imported products will be made unavailable but retained.`)) return;
     setDisconnecting(prev => ({ ...prev, [conn.id]: true }));
     try {
       await fetch(`/api/integrations/${conn.id}`, { method: "DELETE" });
@@ -305,9 +341,6 @@ export default function IntegrationsTab({ onAddProduct }) {
       setDisconnecting(prev => { const n = { ...prev }; delete n[conn.id]; return n; });
     }
   };
-
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-  const connFor = (platformId) => connections.find(c => c.platform === platformId);
 
   return (
     <div>
@@ -320,15 +353,19 @@ export default function IntegrationsTab({ onAddProduct }) {
         variants={stagger} initial="hidden" animate="visible"
         className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
       >
-        {PLATFORMS.map((platform) => {
-          const conn = connFor(platform.id);
+        {PLATFORMS.flatMap((platform) => {
+          const matches = connections.filter((connection) => connection.platform === platform.id);
+          return matches.length
+            ? matches.map((conn, index) => ({ platform, conn, canAdd: index === 0 }))
+            : [{ platform, conn: null, canAdd: false }];
+        }).map(({ platform, conn, canAdd }) => {
           const isSyncing     = conn && syncing[conn.id];
           const syncErr       = conn && syncErrors[conn.id];
           const syncRes       = conn && syncResults[conn.id];
           const isDisconnecting = conn && disconnecting[conn.id];
 
           return (
-            <motion.div key={platform.id} variants={fadeUp}
+            <motion.div key={conn ? `${platform.id}-${conn.id}` : platform.id} variants={fadeUp}
               className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-300 hover:shadow-md hover:shadow-black/5 transition-all duration-300 flex flex-col gap-4"
             >
               {/* Header */}
@@ -366,11 +403,14 @@ export default function IntegrationsTab({ onAddProduct }) {
               {/* Connected details */}
               {conn && (
                 <div className="text-[11px] text-gray-400 space-y-0.5">
-                  {conn.product_count > 0 && (
-                    <div><span className="font-semibold text-black">{conn.product_count}</span> products synced</div>
-                  )}
+                  <div><span className="font-semibold text-black">{conn.product_count || 0}</span> products synced</div>
                   {conn.last_synced_at && (
                     <div>Last synced {relativeTime(conn.last_synced_at)}</div>
+                  )}
+                  {conn.active_job && (
+                    <div className="text-amber-600">
+                      {conn.active_job.counts?.discovered || 0} products checked · ready to resume
+                    </div>
                   )}
                   {conn.store_url && !conn.store_url.includes("manage.wix") && !conn.store_url.includes("mybigcommerce") && !conn.store_url.includes("app.ecwid") && !conn.store_url.includes("etsy.com/shop") && (
                     <a href={conn.store_url} target="_blank" rel="noopener noreferrer"
@@ -383,8 +423,23 @@ export default function IntegrationsTab({ onAddProduct }) {
 
               {/* Sync result */}
               {syncRes && (
-                <div className="text-[11px] bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 text-emerald-700">
-                  ✓ Synced {syncRes.imported} of {syncRes.total} products
+                <div className={`text-[11px] rounded-lg px-2.5 py-1.5 border ${
+                  syncRes.errors?.length
+                    ? "bg-amber-50 border-amber-100 text-amber-800"
+                    : "bg-emerald-50 border-emerald-100 text-emerald-700"
+                }`}>
+                  <div>
+                    {syncRes.status === "completed" || syncRes.status === "partial" ? "✓ " : ""}
+                    {syncSummary(syncRes.counts, syncRes.warnings || [])}
+                  </div>
+                  {syncRes.errors?.slice(0, 3).map((issue, index) => (
+                    <div key={`${issue?.externalId || issue?.index || "issue"}-${index}`} className="mt-1">
+                      {syncIssueText(issue)}
+                    </div>
+                  ))}
+                  {syncRes.errors?.length > 3 && (
+                    <div className="mt-1">+{syncRes.errors.length - 3} more product errors</div>
+                  )}
                 </div>
               )}
               {syncErr && (
@@ -403,7 +458,9 @@ export default function IntegrationsTab({ onAddProduct }) {
                   >
                     {isSyncing
                       ? <><Loader2 size={12} className="animate-spin" /> Syncing…</>
-                      : <><RefreshCw size={12} /> Sync now</>
+                      : conn.active_job || conn.status === "syncing"
+                        ? <><RefreshCw size={12} /> Resume sync</>
+                        : <><RefreshCw size={12} /> Sync now</>
                     }
                   </button>
                   <button
@@ -414,6 +471,16 @@ export default function IntegrationsTab({ onAddProduct }) {
                   >
                     {isDisconnecting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   </button>
+                  {canAdd && (
+                    <button
+                      onClick={() => openModal(platform)}
+                      disabled={isSyncing || isDisconnecting}
+                      className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-black transition-colors disabled:opacity-40"
+                      title={`Connect another ${platform.name} store`}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button
@@ -486,9 +553,24 @@ export default function IntegrationsTab({ onAddProduct }) {
                     <div className="text-center">
                       <p className="font-semibold text-black">{modal.name} connected!</p>
                       {syncResult && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          Imported <span className="font-semibold text-black">{syncResult.imported}</span> of <span className="font-semibold text-black">{syncResult.total}</span> products
-                        </p>
+                        <div className="text-sm text-gray-500 mt-1 space-y-1">
+                          <p>{syncSummary(syncResult.counts, syncResult.warnings || [])}</p>
+                          {Number(syncResult.counts?.discovered || 0) > 0 && (
+                            <p><span className="font-semibold text-black">{syncResult.counts.discovered}</span> products checked</p>
+                          )}
+                          {Number(syncResult.errors?.length || 0) > 0 && (
+                            <div className="text-left rounded-lg bg-amber-50 border border-amber-100 p-2 text-xs text-amber-800">
+                              {syncResult.errors.slice(0, 3).map((issue, index) => (
+                                <p key={`${issue?.externalId || issue?.index || "issue"}-${index}`}>
+                                  {syncIssueText(issue)}
+                                </p>
+                              ))}
+                              {syncResult.errors.length > 3 && (
+                                <p>+{syncResult.errors.length - 3} more product errors</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                     <button onClick={() => setModal(null)}
@@ -609,7 +691,7 @@ export default function IntegrationsTab({ onAddProduct }) {
                     {connectStep === "connecting" ? (
                       <><Loader2 size={14} className="animate-spin" /> Connecting…</>
                     ) : connectStep === "syncing" ? (
-                      <><Loader2 size={14} className="animate-spin" /> Syncing products…</>
+                      <><Loader2 size={14} className="animate-spin" /> Syncing {syncResult?.counts?.discovered || 0} products…</>
                     ) : (
                       "Save & connect"
                     )}

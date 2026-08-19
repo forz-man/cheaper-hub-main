@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import AuthShell from "@/components/auth/AuthShell";
-import { supabase } from "@/lib/supabase";
 
 function SelectRoleContent() {
   const router = useRouter();
@@ -26,17 +25,13 @@ function SelectRoleContent() {
       setLoading(role);
       setError("");
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-
-        const { error: updateError } = await supabase.auth.updateUser({
-          data: { role },
+        const response = await fetch("/api/auth/select-role", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role }),
         });
-        if (updateError) throw updateError;
-
-        await supabase
-          .from("profiles")
-          .upsert({ id: user.id, role }, { onConflict: "id" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Account type could not be saved");
 
         router.replace(role === "vendor" ? "/dashboard/vendor" : "/dashboard/buyer");
       } catch {

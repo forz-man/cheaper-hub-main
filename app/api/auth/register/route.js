@@ -5,6 +5,12 @@ import dns from "dns";
 export async function POST(request) {
   try {
     const { email, password, fullName, username, role, next } = await request.json();
+    if (role !== "buyer" && role !== "vendor") {
+      return NextResponse.json(
+        { success: false, error: "Choose a valid account type." },
+        { status: 400 },
+      );
+    }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -27,9 +33,7 @@ export async function POST(request) {
     const callbackUrl = new URL("/api/auth/callback", new URL(request.url).origin);
     if (safeNext) callbackUrl.searchParams.set("next", safeNext);
     callbackUrl.searchParams.set("signup", "1");
-    if (role === "buyer" || role === "vendor") {
-      callbackUrl.searchParams.set("role", role);
-    }
+    callbackUrl.searchParams.set("role", role);
 
     // Perform DNS lookup check to prevent unhandled fetch rejections for unresolvable domains
     try {

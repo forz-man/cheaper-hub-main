@@ -3,3 +3,4 @@
 - [Supabase new-format API keys](supabase-key-format.md) — sb_publishable_/sb_secret_ prefixes distinguish anon vs service-role; a wrong-key mix-up silently breaks admin operations like RLS bypass.
 - [External Supabase schema changes](external-supabase-schema-changes.md) — agent has no DB password for the user's external Supabase, so table/column DDL must be handed to the user as SQL to run themselves, not applied programmatically.
 - [Public npm lockfiles](public-npm-lockfiles.md) — shared deployments need a public-registry lockfile, never Replit firewall tarball URLs.
+- [Integration security boundaries](integration-security-boundaries.md) — privileged roles are DB-authoritative; external API requests pin public IPs and reject cross-origin redirects.

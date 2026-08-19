@@ -1,22 +1,66 @@
-import { createClient } from "@/lib/server";
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
+import { withSecurityHeaders } from "@/lib/secure-headers";
+import { isUuid, requireVendor } from "@/lib/integrations/auth";
+import {
+  archiveConnectionProducts,
+  getOwnedConnection,
+  publicDatabaseError,
+} from "@/lib/integrations/repository";
 
-// DELETE /api/integrations/[id] — disconnect a store
+const DELETE_LIMIT = rateLimit({ maxRequests: 20 });
+
+function json(payload, init) {
+  return withSecurityHeaders(NextResponse.json(payload, init));
+}
+
 export async function DELETE(request, { params }) {
+  const limited = DELETE_LIMIT(request);
+  if (limited.error) return limited.error;
+  const { id } = await params;
+  if (!isUuid(id)) return json({ message: "Invalid store connection." }, { status: 400 });
+
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const { error, user, admin } = await requireVendor();
+    if (error) return error;
+    const connection = await getOwnedConnection(admin, user.id, id);
+    if (!connection) return json({ message: "Store connection not found." }, { status: 404 });
 
-    const { error } = await supabase
+    const now = new Date().toISOString();
+    await admin
+      .from("store_sync_jobs")
+      .update({
+        status: "failed",
+        error_message: "The store was disconnected.",
+        lease_token: null,
+        lease_expires_at: null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq("vendor_id", user.id)
+      .eq("connection_id", id)
+      .in("status", ["queued", "running"]);
+
+    const { error: databaseError } = await admin
       .from("store_connections")
-      .delete()
-      .eq("id", params.id)
-      .eq("vendor_id", user.id); // RLS double-check
+      .update({
+        status: "disconnected",
+        credentials_ciphertext: null,
+        credentials: {},
+        disconnected_at: now,
+        error_message: null,
+        updated_at: now,
+      })
+      .eq("id", id)
+      .eq("vendor_id", user.id);
+    if (databaseError) throw databaseError;
+    await archiveConnectionProducts(admin, user.id, id);
 
-    if (error) return NextResponse.json({ message: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ message: e.message }, { status: 500 });
+    return json({ ok: true });
+  } catch (error) {
+    return json(
+      { message: publicDatabaseError(error, "The store could not be disconnected.") },
+      { status: 500 },
+    );
   }
 }
