@@ -44,7 +44,7 @@ export default function HomePage() {
 
   return (
     <div className="bg-white text-black min-h-screen">
-      <main>
+      <main className="pt-14 sm:pt-16 md:pt-[72px]">
         <HeroSection />
         <HowItWorks />
         <FeaturedDeals products={products} loading={loading} />
