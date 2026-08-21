@@ -26,22 +26,48 @@ export default function ContactPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus("sending");
     setErrorMsg("");
+
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const message = form.message.trim();
+
+    if (!name) {
+      setErrorMsg("Please enter your name.");
+      setStatus("error");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      setErrorMsg("Please enter a valid email address.");
+      setStatus("error");
+      return;
+    }
+
+    if (!message || message.length < 5) {
+      setErrorMsg("Please enter a message with at least 5 characters.");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("sending");
     try {
       const topicLabel = TOPICS.find((t) => t.id === topic)?.label;
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          subject: form.subject || topicLabel,
-          message: form.message,
+          name,
+          email,
+          subject: form.subject.trim() || topicLabel,
+          message,
         }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Something went wrong");
+      if (!res.ok) throw new Error(data.message || "Failed to send message.");
+
       setStatus("sent");
       setForm({ name: "", email: "", subject: "", message: "" });
     } catch (err) {
@@ -168,9 +194,10 @@ export default function ContactPage() {
                       name="name"
                       value={form.name}
                       onChange={handleChange}
+                      disabled={status === "sending"}
                       required
                       placeholder="Jane Doe"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                     />
                   </div>
                   <div>
@@ -180,9 +207,10 @@ export default function ContactPage() {
                       name="email"
                       value={form.email}
                       onChange={handleChange}
+                      disabled={status === "sending"}
                       required
                       placeholder="you@example.com"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -194,8 +222,9 @@ export default function ContactPage() {
                     name="subject"
                     value={form.subject}
                     onChange={handleChange}
+                    disabled={status === "sending"}
                     placeholder={TOPICS.find((t) => t.id === topic)?.label}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -205,10 +234,11 @@ export default function ContactPage() {
                     name="message"
                     value={form.message}
                     onChange={handleChange}
+                    disabled={status === "sending"}
                     required
                     rows={6}
                     placeholder="How can we help?"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300 resize-none"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black placeholder:text-gray-300 resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
