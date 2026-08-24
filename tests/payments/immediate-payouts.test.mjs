@@ -283,6 +283,33 @@ class RecoveryDatabase {
         });
       }
 
+      if (name === "reconcile_stale_payout_recovery") {
+        return this.itemLock.run(async () => {
+          const recovery = this.tables.payout_recovery_events.find((candidate) => candidate.id === params.p_recovery_id);
+          if (recovery.status !== "processing") return recovery;
+          const isStale = Date.now() - new Date(recovery.attempt_started_at).getTime()
+            >= params.p_stale_after_seconds * 1000;
+          if (!isStale) return recovery;
+
+          recovery.status = params.p_stripe_transfer_reversal_id ? "recovered" : "needs_support";
+          recovery.stripe_transfer_reversal_id = params.p_stripe_transfer_reversal_id || recovery.stripe_transfer_reversal_id;
+          recovery.error = params.p_stripe_transfer_reversal_id ? null : params.p_error;
+          recovery.attempt_token = null;
+          recovery.attempt_started_at = null;
+          const item = this.tables.order_items.find((candidate) => candidate.id === recovery.order_item_id);
+          const recoveredCents = this.tables.payout_recovery_events
+            .filter((candidate) => candidate.order_item_id === recovery.order_item_id && candidate.status === "recovered")
+            .reduce((sum, candidate) => sum + candidate.amount_cents, 0);
+          const hasSupport = this.tables.payout_recovery_events.some(
+            (candidate) => candidate.order_item_id === recovery.order_item_id && candidate.status === "needs_support"
+          );
+          item.payout_recovered_amount = recoveredCents / 100;
+          item.payout_recovery_status = hasSupport ? "needs_support" : recoveredCents > 0 ? "recovered" : "none";
+          item.payout_recovery_error = hasSupport ? params.p_error : null;
+          return recovery;
+        });
+      }
+
       if (name === "reinstate_payout_recovery") {
         return this.itemLock.run(async () => {
           const recovery = this.tables.payout_recovery_events.find((candidate) => candidate.id === params.p_recovery_id);
@@ -322,6 +349,7 @@ class StripeRecoveryStub {
     this.failNextReinstatement = failNextReinstatement;
     this.reversalCalls = [];
     this.successfulReversals = [];
+    this.existingReversals = [];
     this.reinstatementCalls = [];
     this.successfulReinstatements = [];
     this.idempotentReversals = new Map();
@@ -336,10 +364,23 @@ class StripeRecoveryStub {
     }
     const existing = this.idempotentReversals.get(options.idempotencyKey);
     if (existing) return existing;
-    const reversal = { id: `trr_${this.reversalCalls.length}` };
+    const reversal = { id: `trr_${this.reversalCalls.length}`, transfer_id: transferId, metadata: params.metadata };
     this.idempotentReversals.set(options.idempotencyKey, reversal);
     this.successfulReversals.push(reversal);
     return reversal;
+  }
+
+  async listReversals(transferId) {
+    return {
+      data: [...this.existingReversals, ...this.successfulReversals].filter(
+        (reversal) => reversal.transfer_id === transferId
+      ),
+      has_more: false,
+    };
+  }
+
+  seedExistingReversal(reversal) {
+    this.existingReversals.push(reversal);
   }
 
   async reinstateTransfer(params, options) {
@@ -359,6 +400,7 @@ class StripeRecoveryStub {
       transfers: {
         createReversal: this.reverseTransfer.bind(this),
         create: this.reinstateTransfer.bind(this),
+        listReversals: this.listReversals.bind(this),
       },
     };
   }
@@ -563,6 +605,69 @@ test("failed or timed-out seller recovery stays retryable with the same Stripe i
     stripe.reversalCalls[1].options.idempotencyKey
   );
   assert.equal(stripe.reversalCalls[0].options.timeout, stripe.reversalCalls[1].options.timeout);
+});
+
+test("a redelivered webhook resumes a reversal abandoned before Stripe was called", async () => {
+  const database = new RecoveryDatabase();
+  const stripe = new StripeRecoveryStub();
+  const event = refundEvent({ eventId: "evt_refund_interrupted", refundId: "re_interrupted" });
+  database.tables.payout_recovery_events.push({
+    id: "recovery_interrupted",
+    order_id: "order_1",
+    order_item_id: "item_1",
+    vendor_id: "vendor_1",
+    stripe_event_id: event.id,
+    stripe_adjustment_id: "re_interrupted",
+    event_type: "refund",
+    amount_cents: 300,
+    stripe_transfer_id: "tr_1",
+    status: "processing",
+    attempt_token: "abandoned-worker",
+    attempt_started_at: new Date(Date.now() - 121_000).toISOString(),
+  });
+  database.tables.order_items[0].payout_recovery_status = "pending";
+
+  const result = await processEvent(database, stripe, event);
+
+  assert.equal(result.retryRequired, false);
+  assert.equal(database.tables.payout_recovery_events[0].status, "recovered");
+  assert.equal(database.tables.order_items[0].payout_recovered_amount, 3);
+  assert.equal(stripe.successfulReversals.length, 1);
+  assert.equal(stripe.reversalCalls[0].options.idempotencyKey, "payout-recovery-re_interrupted-item_1");
+});
+
+test("a redelivered webhook records a Stripe reversal completed before the server interruption", async () => {
+  const database = new RecoveryDatabase();
+  const stripe = new StripeRecoveryStub();
+  const event = refundEvent({ eventId: "evt_refund_recorded_late", refundId: "re_recorded_late" });
+  database.tables.payout_recovery_events.push({
+    id: "recovery_recorded_late",
+    order_id: "order_1",
+    order_item_id: "item_1",
+    vendor_id: "vendor_1",
+    stripe_event_id: event.id,
+    stripe_adjustment_id: "re_recorded_late",
+    event_type: "refund",
+    amount_cents: 300,
+    stripe_transfer_id: "tr_1",
+    status: "processing",
+    attempt_token: "abandoned-worker",
+    attempt_started_at: new Date(Date.now() - 121_000).toISOString(),
+  });
+  database.tables.order_items[0].payout_recovery_status = "pending";
+  stripe.seedExistingReversal({
+    id: "trr_existing",
+    transfer_id: "tr_1",
+    metadata: { stripe_adjustment_id: "re_recorded_late", recovery_type: "refund" },
+  });
+
+  const result = await processEvent(database, stripe, event);
+
+  assert.equal(result.retryRequired, false);
+  assert.equal(database.tables.payout_recovery_events[0].status, "recovered");
+  assert.equal(database.tables.payout_recovery_events[0].stripe_transfer_reversal_id, "trr_existing");
+  assert.equal(database.tables.order_items[0].payout_recovered_amount, 3);
+  assert.equal(stripe.reversalCalls.length, 0);
 });
 
 test("a won dispute reinstates a seller transfer after reversing it", async () => {

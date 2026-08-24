@@ -429,6 +429,69 @@ begin
 end;
 $$;
 
+-- A worker can be interrupted after it reserves a recovery but before it
+-- records Stripe's response. Webhook redelivery first checks Stripe for the
+-- deterministic reversal; this RPC then either records that result or makes
+-- the abandoned claim retryable. It never takes over a live reservation.
+create or replace function public.reconcile_stale_payout_recovery(
+  p_recovery_id uuid,
+  p_stale_after_seconds integer,
+  p_stripe_transfer_reversal_id text,
+  p_error text
+) returns public.payout_recovery_events
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recovery public.payout_recovery_events;
+  recovered_cents integer;
+  has_support boolean;
+  next_status text;
+begin
+  if p_stale_after_seconds < 1 then
+    raise exception 'Stale recovery threshold must be positive';
+  end if;
+  select * into recovery from public.payout_recovery_events where id = p_recovery_id for update;
+  if not found then raise exception 'Payout recovery % was not found', p_recovery_id; end if;
+  if recovery.status <> 'processing'
+    or recovery.attempt_started_at is null
+    or recovery.attempt_started_at > now() - make_interval(secs => p_stale_after_seconds) then
+    return recovery;
+  end if;
+
+  perform 1 from public.order_items where id = recovery.order_item_id for update;
+  next_status := case when p_stripe_transfer_reversal_id is not null then 'recovered' else 'needs_support' end;
+  update public.payout_recovery_events
+  set status = next_status,
+      stripe_transfer_reversal_id = case
+        when next_status = 'recovered' then p_stripe_transfer_reversal_id
+        else stripe_transfer_reversal_id
+      end,
+      error = case when next_status = 'recovered' then null else p_error end,
+      attempt_token = null,
+      attempt_started_at = null,
+      resolved_at = now()
+  where id = p_recovery_id
+  returning * into recovery;
+
+  select coalesce(sum(amount_cents), 0) into recovered_cents
+  from public.payout_recovery_events
+  where order_item_id = recovery.order_item_id and status = 'recovered';
+  select exists(
+    select 1 from public.payout_recovery_events
+    where order_item_id = recovery.order_item_id and status = 'needs_support'
+  ) into has_support;
+  update public.order_items
+  set payout_recovered_amount = recovered_cents::numeric / 100,
+      payout_recovered_at = case when next_status = 'recovered' then now() else payout_recovered_at end,
+      payout_recovery_status = case when has_support then 'needs_support' when recovered_cents > 0 then 'recovered' else 'none' end,
+      payout_recovery_error = case when has_support then p_error else null end
+  where id = recovery.order_item_id;
+  return recovery;
+end;
+$$;
+
 create or replace function public.reinstate_payout_recovery(
   p_recovery_id uuid,
   p_stripe_reinstatement_transfer_id text
@@ -502,11 +565,13 @@ $$;
 revoke execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text, uuid) from public, anon, authenticated;
 revoke execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) from public, anon, authenticated;
 revoke execute on function public.finalize_payout_recovery(uuid, uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.reconcile_stale_payout_recovery(uuid, integer, text, text) from public, anon, authenticated;
 revoke execute on function public.reinstate_payout_recovery(uuid, text) from public, anon, authenticated;
 revoke execute on function public.mark_payout_reinstatement_failure(uuid, text) from public, anon, authenticated;
 grant execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text, uuid) to service_role;
 grant execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) to service_role;
 grant execute on function public.finalize_payout_recovery(uuid, uuid, text, text, text) to service_role;
+grant execute on function public.reconcile_stale_payout_recovery(uuid, integer, text, text) to service_role;
 grant execute on function public.reinstate_payout_recovery(uuid, text) to service_role;
 grant execute on function public.mark_payout_reinstatement_failure(uuid, text) to service_role;
 
