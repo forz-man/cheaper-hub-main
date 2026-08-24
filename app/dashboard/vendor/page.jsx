@@ -50,7 +50,16 @@ const NEXT_FULFILLMENT_ACTION = {
 
 const CATEGORIES = ["Electronics", "Fashion", "Home & Living", "Food & Bev", "Sports", "Books"];
 
-const emptyForm = { name: "", price: "", original_price: "", stock: "", category: "", description: "" };
+const emptyForm = {
+  name: "",
+  price: "",
+  original_price: "",
+  stock: "",
+  category: "",
+  description: "",
+  features: "",
+  specs: "",
+};
 
 const CSV_HEADERS = [
   "name",
@@ -59,6 +68,8 @@ const CSV_HEADERS = [
   "stock",
   "category",
   "description",
+  "features",
+  "specs",
   "images",
 ];
 
@@ -109,6 +120,56 @@ function parseCsv(text) {
   return records;
 }
 
+function parseFeatures(value) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+
+  if (text.startsWith("[")) {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed) || parsed.some((feature) => typeof feature !== "string")) {
+      throw new Error("Features must be a list of text values.");
+    }
+    return parsed.map((feature) => feature.trim()).filter(Boolean);
+  }
+
+  return text
+    .split(/[;\n|]/)
+    .map((feature) => feature.trim())
+    .filter(Boolean);
+}
+
+function parseSpecs(value) {
+  const text = String(value || "").trim();
+  if (!text) return {};
+
+  if (text.startsWith("{")) {
+    const parsed = JSON.parse(text);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new Error("Specs must be a key-value object.");
+    }
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, val]) => [key.trim(), String(val).trim()])
+        .filter(([key, val]) => key && val)
+    );
+  }
+
+  return Object.fromEntries(
+    text
+      .split(/\n|[;|]/)
+      .map((line) => {
+        const separator = line.indexOf(":") >= 0 ? ":" : "=";
+        const separatorIndex = line.indexOf(separator);
+        if (separatorIndex < 1) return null;
+        return [
+          line.slice(0, separatorIndex).trim(),
+          line.slice(separatorIndex + 1).trim(),
+        ];
+      })
+      .filter((entry) => entry && entry[0] && entry[1])
+  );
+}
+
 function parseProductCsv(text) {
   const records = parseCsv(text);
   if (records.length < 2) {
@@ -124,6 +185,10 @@ function parseProductCsv(text) {
     msrp: "original_price",
     inventory: "stock",
     quantity: "stock",
+    feature: "features",
+    product_features: "features",
+    specification: "specs",
+    specifications: "specs",
     image: "images",
     image_url: "images",
     image_urls: "images",
@@ -178,6 +243,25 @@ function parseProductCsv(text) {
       }
     }
 
+    let features = [];
+    let specs = {};
+    if (raw.features) {
+      try {
+        features = parseFeatures(raw.features);
+      } catch {
+        errors.push(`Row ${line}: features must be separated by semicolons or be a JSON array.`);
+        rowValid = false;
+      }
+    }
+    if (raw.specs) {
+      try {
+        specs = parseSpecs(raw.specs);
+      } catch {
+        errors.push(`Row ${line}: specs must use Key: Value pairs or be a JSON object.`);
+        rowValid = false;
+      }
+    }
+
     if (rowValid) {
       rows.push({
         line,
@@ -187,6 +271,8 @@ function parseProductCsv(text) {
         stock,
         category: raw.category || "General",
         description: raw.description || null,
+        features,
+        specs,
         images,
       });
     }
@@ -586,6 +672,8 @@ export default function VendorDashboard() {
         vendor_name: vendorName,
         name: row.name,
         description: row.description,
+        features: row.features,
+        specs: row.specs,
         category: row.category,
         price: row.price,
         original_price: row.original_price,
@@ -665,6 +753,8 @@ export default function VendorDashboard() {
         vendor_name: displayName,
         name: form.name.trim(),
         description: form.description.trim() || null,
+        features: parseFeatures(form.features),
+        specs: parseSpecs(form.specs),
         category: finalCategory,
         price: parseFloat(form.price),
         original_price: form.original_price ? parseFloat(form.original_price) : null,
@@ -1302,6 +1392,33 @@ export default function VendorDashboard() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 block mb-1.5">Features</label>
+                  <textarea
+                    name="features"
+                    value={form.features}
+                    onChange={handleFormChange}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black resize-none"
+                    rows={4}
+                    placeholder={"Lightweight\nNoise cancellation\nAll-day battery"}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">One feature per line.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 block mb-1.5">Specs</label>
+                  <textarea
+                    name="specs"
+                    value={form.specs}
+                    onChange={handleFormChange}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-black text-black resize-none"
+                    rows={4}
+                    placeholder={"Brand: Nike\nColor: Pink\nMaterial: Mesh"}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">Use one Key: Value pair per line.</p>
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-gray-500 block mb-1.5">Photos</label>
                 <div className="flex flex-wrap gap-2">
@@ -1382,9 +1499,9 @@ export default function VendorDashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-black">Choose a CSV file</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      Required columns: <span className="font-medium text-gray-700">name, price</span>. Optional: original_price, stock, category, description, images.
+                       Required columns: <span className="font-medium text-gray-700">name, price</span>. Optional: original_price, stock, category, description, features, specs, images.
                     </p>
-                    <p className="text-[11px] text-gray-400 mt-1">Use semicolons between multiple image URLs. Maximum file size: 5MB.</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Separate features with semicolons and specs as Key: Value pairs separated by semicolons. Maximum file size: 5MB.</p>
                     <div className="flex items-center gap-3 mt-3">
                       <label className="inline-flex items-center gap-2 bg-black text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer hover:bg-gray-800 transition-colors">
                         <Upload size={13} />
