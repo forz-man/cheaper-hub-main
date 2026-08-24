@@ -143,12 +143,6 @@ DECLARE
   claim_cents INTEGER;
   created_recovery public.payout_recovery_events;
 BEGIN
-  SELECT * INTO existing_recovery
-  FROM public.payout_recovery_events
-  WHERE stripe_adjustment_id = p_stripe_adjustment_id
-    AND order_item_id = p_order_item_id;
-  IF FOUND THEN RETURN existing_recovery; END IF;
-
   PERFORM 1 FROM public.order_items
   WHERE id = p_order_item_id
     AND order_id = p_order_id
@@ -157,6 +151,14 @@ BEGIN
     AND payout_status = 'released'
   FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Order item % was not found', p_order_item_id; END IF;
+
+  -- Recheck only after the item lock. A concurrent delivery may have created
+  -- the canonical recovery while this call was waiting for that lock.
+  SELECT * INTO existing_recovery
+  FROM public.payout_recovery_events
+  WHERE stripe_adjustment_id = p_stripe_adjustment_id
+    AND order_item_id = p_order_item_id;
+  IF FOUND THEN RETURN existing_recovery; END IF;
 
   SELECT COALESCE(round(payout_amount * 100)::INTEGER, 0) INTO payout_cents
   FROM public.order_items WHERE id = p_order_item_id;
