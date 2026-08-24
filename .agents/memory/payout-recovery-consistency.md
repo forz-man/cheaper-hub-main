@@ -29,3 +29,16 @@ safe retry.
 
 **How to apply:** keep the relationship validation and `FOR UPDATE` together,
 then read the unique recovery key before calculating capacity or inserting.
+
+A recovery attempt that is actively calling Stripe must be a non-stealable
+reservation. Do not reclaim it just because its start time is old.
+
+**Why:** a database token cannot fence an already-issued third-party request.
+Reassigning a timed lease can make two workers call the same reversal endpoint
+while the first is merely slow, creating a webhook storm even though Stripe's
+idempotency key protects the money movement.
+
+**How to apply:** only the token owner calls Stripe and finalizes the ledger.
+Set a bounded request timeout; when that request returns an error or timeout,
+the owner changes the recovery to `needs_support`, making a later delivery safe
+to claim and retry with the same deterministic Stripe idempotency key.

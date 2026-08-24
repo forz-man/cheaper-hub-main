@@ -201,7 +201,9 @@ create table if not exists public.payout_recovery_events (
   stripe_transfer_id text not null,
   stripe_transfer_reversal_id text,
   stripe_reinstatement_transfer_id text,
-  status text not null default 'pending' check (status in ('pending', 'recovered', 'reinstated', 'needs_support', 'not_applicable')),
+  status text not null default 'pending' check (status in ('pending', 'processing', 'recovered', 'reinstated', 'needs_support', 'not_applicable')),
+  attempt_token uuid,
+  attempt_started_at timestamptz,
   error text,
   created_at timestamptz default now(),
   resolved_at timestamptz,
@@ -235,6 +237,7 @@ alter table public.stripe_payment_adjustments enable row level security;
 -- Atomically reserve the remaining recovery capacity before any Stripe API
 -- call. This protects overlapping webhooks for different partial refunds from
 -- reversing a transfer beyond its original amount.
+drop function if exists public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text);
 create or replace function public.claim_payout_recovery(
   p_order_id uuid,
   p_order_item_id uuid,
@@ -243,7 +246,8 @@ create or replace function public.claim_payout_recovery(
   p_stripe_adjustment_id text,
   p_event_type text,
   p_requested_amount_cents integer,
-  p_stripe_transfer_id text
+  p_stripe_transfer_id text,
+  p_attempt_token uuid
 ) returns public.payout_recovery_events
 language plpgsql
 security definer
@@ -267,27 +271,44 @@ begin
 
   -- Recheck only after the item lock. A concurrent delivery may have created
   -- the canonical recovery while this call was waiting for that lock.
+  -- A processing reservation is intentionally never stolen: a slow worker may
+  -- still be inside Stripe. Stripe errors and request timeouts move it to
+  -- needs_support, which is safe for a later delivery to retry.
   select * into existing_recovery
   from public.payout_recovery_events
   where stripe_adjustment_id = p_stripe_adjustment_id
     and order_item_id = p_order_item_id;
-  if found then return existing_recovery; end if;
+  if found then
+    if existing_recovery.status in ('pending', 'needs_support') then
+      update public.payout_recovery_events
+      set status = 'processing',
+          attempt_token = p_attempt_token,
+          attempt_started_at = now(),
+          error = null,
+          resolved_at = null
+      where id = existing_recovery.id
+      returning * into existing_recovery;
+    end if;
+    return existing_recovery;
+  end if;
 
   select coalesce(round(payout_amount * 100)::integer, 0) into payout_cents
   from public.order_items where id = p_order_item_id;
   select coalesce(sum(amount_cents), 0) into already_claimed_cents
   from public.payout_recovery_events
   where order_item_id = p_order_item_id
-    and status in ('pending', 'recovered', 'needs_support');
+    and status in ('pending', 'processing', 'recovered', 'needs_support');
 
   claim_cents := greatest(0, least(coalesce(p_requested_amount_cents, 0), payout_cents - already_claimed_cents));
   insert into public.payout_recovery_events (
     order_id, order_item_id, vendor_id, stripe_event_id, stripe_adjustment_id,
-    event_type, amount_cents, stripe_transfer_id, status
+    event_type, amount_cents, stripe_transfer_id, status, attempt_token, attempt_started_at
   ) values (
     p_order_id, p_order_item_id, p_vendor_id, p_stripe_event_id, p_stripe_adjustment_id,
     p_event_type, claim_cents, p_stripe_transfer_id,
-    case when claim_cents > 0 then 'pending' else 'not_applicable' end
+    case when claim_cents > 0 then 'processing' else 'not_applicable' end,
+    case when claim_cents > 0 then p_attempt_token else null end,
+    case when claim_cents > 0 then now() else null end
   ) returning * into created_recovery;
 
   if claim_cents > 0 then
@@ -354,8 +375,10 @@ begin
 end;
 $$;
 
+drop function if exists public.finalize_payout_recovery(uuid, text, text, text);
 create or replace function public.finalize_payout_recovery(
   p_recovery_id uuid,
+  p_attempt_token uuid,
   p_status text,
   p_stripe_transfer_reversal_id text,
   p_error text
@@ -374,12 +397,17 @@ begin
   end if;
   select * into recovery from public.payout_recovery_events where id = p_recovery_id for update;
   if not found then raise exception 'Payout recovery % was not found', p_recovery_id; end if;
+  if recovery.status <> 'processing' or recovery.attempt_token is distinct from p_attempt_token then
+    return recovery;
+  end if;
   perform 1 from public.order_items where id = recovery.order_item_id for update;
 
   update public.payout_recovery_events
   set status = p_status,
       stripe_transfer_reversal_id = case when p_status = 'recovered' then p_stripe_transfer_reversal_id else stripe_transfer_reversal_id end,
       error = case when p_status = 'recovered' then null else p_error end,
+      attempt_token = null,
+      attempt_started_at = null,
       resolved_at = now()
   where id = p_recovery_id
   returning * into recovery;
@@ -471,14 +499,14 @@ begin
 end;
 $$;
 
-revoke execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text) from public, anon, authenticated;
+revoke execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text, uuid) from public, anon, authenticated;
 revoke execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) from public, anon, authenticated;
-revoke execute on function public.finalize_payout_recovery(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.finalize_payout_recovery(uuid, uuid, text, text, text) from public, anon, authenticated;
 revoke execute on function public.reinstate_payout_recovery(uuid, text) from public, anon, authenticated;
 revoke execute on function public.mark_payout_reinstatement_failure(uuid, text) from public, anon, authenticated;
-grant execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text) to service_role;
+grant execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text, uuid) to service_role;
 grant execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) to service_role;
-grant execute on function public.finalize_payout_recovery(uuid, text, text, text) to service_role;
+grant execute on function public.finalize_payout_recovery(uuid, uuid, text, text, text) to service_role;
 grant execute on function public.reinstate_payout_recovery(uuid, text) to service_role;
 grant execute on function public.mark_payout_reinstatement_failure(uuid, text) to service_role;
 
