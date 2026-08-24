@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingBag, Heart, Settings, LogOut,
   Package, Star, ArrowUpRight, ChevronRight,
   X, CheckCircle, Truck, Clock, Store, Loader2,
-  Search, Shield, Lock,
+  Search, Shield,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logout, resolveUserRole } from "@/lib/auth";
@@ -492,7 +492,6 @@ export default function BuyerDashboard() {
                     const StatusIcon = sc.Icon;
                     const firstItem = order.order_items?.[0];
                     const canConfirm = !order.buyer_confirmed_at && order.payment_status === "paid" && ["shipped", "delivered"].includes(normStatus(order.status));
-                    const allReleased = order.order_items?.length > 0 && order.order_items.every(i => i.payout_status === "released");
                     return (
                       <div key={order.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                         <div className="flex items-start justify-between gap-4">
@@ -542,24 +541,12 @@ export default function BuyerDashboard() {
                           </div>
                         </div>
 
-                        {/* Payment hold / payout status banner */}
+                        {/* Payment processing banner */}
                         {order.payment_status === "paid" && (
-                          <div className={`mt-3 rounded-xl px-3 py-2.5 text-xs flex items-start gap-2 ${
-                            allReleased
-                              ? "bg-emerald-50 border border-emerald-100 text-emerald-700"
-                              : order.buyer_confirmed_at
-                              ? "bg-blue-50 border border-blue-100 text-blue-700"
-                              : "bg-indigo-50 border border-indigo-100 text-indigo-700"
-                          }`}>
-                            <Lock size={10} className="mt-0.5 flex-shrink-0" />
+                          <div className="mt-3 rounded-xl px-3 py-2.5 text-xs flex items-start gap-2 bg-emerald-50 border border-emerald-100 text-emerald-700">
+                            <Shield size={10} className="mt-0.5 flex-shrink-0" />
                             <span>
-                              {allReleased
-                                ? "Payment released to seller — order complete."
-                                : order.buyer_confirmed_at
-                                ? "You've confirmed receipt. Payment will be released once the seller marks delivery."
-                                : canConfirm
-                                ? "Payment is held by Cheaper. Confirm receipt below to release it to the seller."
-                                : "Payment held by Cheaper until delivery is confirmed by both parties."}
+                              Payment received securely. Seller payouts are initiated automatically after checkout.
                             </span>
                           </div>
                         )}

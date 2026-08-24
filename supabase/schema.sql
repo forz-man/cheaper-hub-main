@@ -128,12 +128,14 @@ create table if not exists public.order_items (
   qty integer not null default 1,
   subtotal numeric(10,2) not null,
   -- Per-vendor fulfillment + payout tracking. Money is captured to the
-  -- platform's own Stripe balance at checkout and held there; a vendor's
-  -- share is only "released" (marked payable) once their item is delivered.
+  -- platform balance at checkout and each vendor's net share is transferred
+  -- immediately after Stripe confirms the payment.
   fulfillment_status text default 'processing' check (fulfillment_status in ('processing', 'shipped', 'delivered', 'cancelled')),
   payout_status text default 'pending' check (payout_status in ('pending', 'released')),
   payout_amount numeric(10,2),
   payout_released_at timestamptz,
+  payout_attempted_at timestamptz,
+  payout_error text,
   created_at timestamptz default now()
 );
 
@@ -142,6 +144,8 @@ alter table public.order_items add column if not exists fulfillment_status text 
 alter table public.order_items add column if not exists payout_status text default 'pending' check (payout_status in ('pending', 'released'));
 alter table public.order_items add column if not exists payout_amount numeric(10,2);
 alter table public.order_items add column if not exists payout_released_at timestamptz;
+alter table public.order_items add column if not exists payout_attempted_at timestamptz;
+alter table public.order_items add column if not exists payout_error text;
 alter table public.order_items add column if not exists created_at timestamptz default now();
 -- Stripe Transfer id once a vendor's payout has actually been sent via Connect.
 alter table public.order_items add column if not exists stripe_transfer_id text;
@@ -183,7 +187,7 @@ create table if not exists public.profiles (
   role text check (role in ('buyer', 'vendor', 'admin')),
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
-  -- Stripe Connect (Express) account used to pay vendors out after delivery.
+  -- Stripe Connect (Express) account used to pay vendors immediately after checkout.
   stripe_account_id text,
   stripe_charges_enabled boolean default false,
   stripe_payouts_enabled boolean default false,

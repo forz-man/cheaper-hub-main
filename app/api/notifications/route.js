@@ -106,7 +106,7 @@ export async function GET(request) {
         });
       }
 
-      const { data: released } = await supabase
+      const { data: sent } = await supabase
         .from("order_items")
         .select("id, product_name, payout_amount, subtotal, payout_released_at")
         .eq("vendor_id", userId)
@@ -115,11 +115,11 @@ export async function GET(request) {
         .order("payout_released_at", { ascending: false })
         .limit(5);
 
-      for (const it of released || []) {
+      for (const it of sent || []) {
         items.push({
           id: `payout-${it.id}`,
           type: "payout",
-          title: "Payout released",
+          title: "Payout sent",
           body: `$${Number(it.payout_amount || it.subtotal).toFixed(2)} for ${it.product_name}`,
           timestamp: it.payout_released_at,
           href: "/dashboard/vendor?tab=payouts",

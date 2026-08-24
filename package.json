@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:integrations": "node --test tests/integrations/*.test.mjs",
+    "test:payments": "node --test tests/payments/*.test.mjs",
     "test:e2e:email": "npx playwright test e2e/full-verification-flow.spec.js --headed"
   },
   "dependencies": {

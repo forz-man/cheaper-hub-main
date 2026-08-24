@@ -1,11 +1,12 @@
--- ── Payment hold & dual-confirmation release columns ─────────────────────────
+-- ── Legacy delivery-confirmation columns ─────────────────────────────────────
+-- Retained for existing order history. New payouts use immediate_vendor_payouts.sql.
 -- Run in your Supabase SQL Editor. All statements are safe to re-run.
 
 -- Buyer delivery confirmation timestamp (set when buyer taps "Confirm delivery")
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS buyer_confirmed_at TIMESTAMPTZ;
 
--- Timestamp set when all vendor payouts for this order have been released
+-- Legacy timestamp retained for existing payout records.
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS payouts_released_at TIMESTAMPTZ;
 

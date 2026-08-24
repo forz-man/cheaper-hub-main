@@ -273,10 +273,10 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                   <p className="text-sm text-[#888] mb-3">
-                    You&apos;ll enter your card details on Stripe&apos;s secure checkout page. Your card is charged immediately, but payment is held by us until delivery is confirmed.
+                    You&apos;ll enter your card details on Stripe&apos;s secure checkout page. Your card is charged after checkout completes securely.
                   </p>
                   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 space-y-1">
-                    <div className="flex items-start gap-1.5 break-words"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Money held with Cheaper until both you and the seller confirm delivery</div>
+                    <div className="flex items-start gap-1.5 break-words"><Lock size={10} className="mt-0.5 flex-shrink-0" /> Sellers are paid automatically after a successful checkout</div>
                     <div className="flex items-start gap-1.5 break-words"><Shield size={10} className="mt-0.5 flex-shrink-0" /> Card data never touches our servers — secured by Stripe</div>
                   </div>
               </div>

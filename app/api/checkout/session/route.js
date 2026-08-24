@@ -60,6 +60,30 @@ export async function POST(req) {
     }
 
     const items_ = resolvedItems;
+    const admin = createAdminClient();
+    const vendorIds = [...new Set(items_.map((item) => item.vendor_id).filter(Boolean))];
+    if (vendorIds.length !== new Set(items_.map((item) => item.vendor_id)).size || vendorIds.length === 0) {
+      return NextResponse.json({ error: "Every item must have a vendor payout account before checkout." }, { status: 422 });
+    }
+
+    const { data: vendorProfiles, error: vendorProfilesErr } = await admin
+      .from("profiles")
+      .select("id, stripe_account_id, stripe_payouts_enabled")
+      .in("id", vendorIds);
+    if (vendorProfilesErr) throw vendorProfilesErr;
+
+    const profilesById = new Map((vendorProfiles || []).map((profile) => [profile.id, profile]));
+    const unavailableVendor = vendorIds.find((vendorId) => {
+      const profile = profilesById.get(vendorId);
+      return !profile?.stripe_account_id || !profile?.stripe_payouts_enabled;
+    });
+    if (unavailableVendor) {
+      return NextResponse.json(
+        { error: "One or more sellers are not ready to receive payments. Please remove those items and try again." },
+        { status: 422 }
+      );
+    }
+
     const subtotal = items_.reduce((sum, i) => sum + i.price * i.qty, 0);
     const shippingFee = subtotal >= 50 ? 0 : 4.99;
     const tax = +(subtotal * 0.08).toFixed(2);
@@ -101,10 +125,8 @@ export async function POST(req) {
     if (itemsErr) throw itemsErr;
 
     const origin = req.headers.get("origin") || `https://${req.headers.get("host")}`;
-    const admin = createAdminClient();
-
-    // Stripe Checkout captures payment to the platform balance. Payouts are
-    // released later through Stripe Connect after delivery is confirmed.
+    // Stripe Checkout captures one platform charge. A verified successful
+    // payment immediately creates separate Connect transfers per vendor item.
     const stripe = await getUncachableStripeClient();
 
     const line_items = items_.map((item) => ({

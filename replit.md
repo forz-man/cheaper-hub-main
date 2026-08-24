@@ -1,6 +1,6 @@
 # Cheaper — Peer-to-Peer Marketplace
 
-A full-stack Next.js 16 marketplace where vendors list products and buyers purchase them. Payments are captured by Stripe and only released to vendors when **both** the buyer and vendor confirm delivery.
+A full-stack Next.js 16 marketplace where vendors list products and buyers purchase them. Payments are captured by Stripe and vendor shares are transferred immediately after a successful checkout.
 
 ## Stack
 
@@ -15,31 +15,28 @@ A full-stack Next.js 16 marketplace where vendors list products and buyers purch
 
 ### Stripe flow
 1. Buyer checks out → Stripe Checkout Session captures card immediately to the platform balance
-2. `payment_status` set to `paid`, `payout_status` on each `order_item` stays `pending`
-3. Vendor marks item `delivered` via their dashboard
-4. Buyer taps **"Confirm I received this order"** in their dashboard → `buyer_confirmed_at` set
-5. When **both** conditions are met → `lib/payouts.js:attemptPayoutRelease()` fires automatically
-   - Creates a Stripe Connect Transfer to the vendor's Express account (minus 10% platform fee)
-   - Sets `order_items.payout_status = 'released'` and `orders.payouts_released_at`
-   - If vendor hasn't connected Stripe, item is still marked released in DB for manual follow-up
+2. A verified successful PaymentIntent sets `payment_status` to `paid`
+3. `lib/payouts.js:markOrderPaidAndSendPayouts()` creates an idempotent Stripe Connect Transfer per vendor item (minus the 10% platform fee)
+4. Successful transfers set `order_items.payout_status = 'released'`; failed transfers remain pending with an audit error for reconciliation
+5. Vendor fulfillment updates and buyer receipt confirmation track delivery only; they do not delay payment
 
 ## Key Files
 
 | Path | Purpose |
 |------|---------|
-| `lib/payouts.js` | Auto-release payout when buyer + vendor both confirm |
+| `lib/payouts.js` | Verify payment and immediately send vendor transfers |
 | `lib/stripeClient.js` | Stripe client |
 | `proxy.js` | Next.js middleware — auth guard + public route list |
 | `app/api/checkout/session/route.js` | Creates the Stripe Checkout session |
-| `app/api/orders/[id]/confirm-delivery/route.js` | Buyer confirms receipt → triggers payout |
-| `app/api/orders/[id]/items/[itemId]/route.js` | Vendor updates fulfillment → triggers payout |
+| `app/api/orders/[id]/confirm-delivery/route.js` | Buyer confirms receipt for order tracking |
+| `app/api/orders/[id]/items/[itemId]/route.js` | Vendor updates fulfillment |
 | `app/api/stripe/webhook/route.js` | Stripe Connect account updates + checkout completion |
 | `supabase/schema.sql` | Full DB schema + RLS policies |
 | `supabase/migrations/` | Incremental SQL migrations (run in Supabase SQL Editor) |
 
 ## Database Setup
 
-Run all files in `supabase/migrations/` in the Supabase SQL Editor. They are all idempotent (`IF NOT EXISTS`). The latest is `payment_hold_release.sql`.
+Run all files in `supabase/migrations/` in the Supabase SQL Editor. They are all idempotent (`IF NOT EXISTS`). The latest is `immediate_vendor_payouts.sql`.
 
 ## Environment Variables Required
 

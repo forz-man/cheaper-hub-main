@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
-import { attemptPayoutRelease } from "@/lib/payouts";
 
 const VALID_TRANSITIONS = {
   processing: ["shipped", "cancelled"],
@@ -12,9 +11,8 @@ const VALID_TRANSITIONS = {
 
 // PATCH /api/orders/[id]/items/[itemId]   { fulfillment_status: "shipped" | "delivered" | "cancelled" }
 //
-// When a vendor marks their item "delivered" AND the buyer has already
-// confirmed receipt, payouts are released automatically via attemptPayoutRelease().
-// If the buyer hasn't confirmed yet, the payout stays pending until they do.
+// Fulfillment updates do not affect payment. Vendor transfers are initiated
+// once Stripe confirms checkout payment.
 export async function PATCH(request, { params }) {
   try {
     const supabase = await createClient();
@@ -50,14 +48,7 @@ export async function PATCH(request, { params }) {
 
     const currentStatus = item.fulfillment_status || "processing";
     const allowed = VALID_TRANSITIONS[currentStatus] || [];
-    // Allow re-running "delivered" on an already-delivered item whose payout
-    // is still pending so a failed transfer can be retried.
-    const isPayoutRetry =
-      newStatus === "delivered" &&
-      currentStatus === "delivered" &&
-      item.payout_status !== "released";
-
-    if (!allowed.includes(newStatus) && !isPayoutRetry) {
+    if (!allowed.includes(newStatus)) {
       return NextResponse.json(
         { error: `Cannot move from "${currentStatus}" to "${newStatus}"` },
         { status: 422 }
@@ -96,30 +87,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: updateErr.message || "Failed to update item" }, { status: 500 });
     }
 
-    let payoutResult = null;
-    let warning = null;
-
-    // When the vendor marks delivered, attempt to release payout immediately.
-    // attemptPayoutRelease will no-op if the buyer hasn't confirmed yet.
-    if (newStatus === "delivered" || isPayoutRetry) {
-      payoutResult = await attemptPayoutRelease(orderId);
-      if (payoutResult.released) {
-        // Re-fetch the updated item so the caller sees the new payout_status
-        const { data: refreshed } = await admin
-          .from("order_items")
-          .select("id, fulfillment_status, payout_status, payout_amount, payout_released_at, stripe_transfer_id")
-          .eq("id", itemId)
-          .single();
-        if (refreshed) Object.assign(updated, refreshed);
-      } else if (payoutResult.reason === "Awaiting buyer confirmation") {
-        warning = "Marked as delivered. Payout will be released automatically once the buyer confirms receipt.";
-      }
-      if (payoutResult.warnings?.length) {
-        console.warn("[items/route] Payout warnings:", payoutResult.warnings);
-      }
-    }
-
-    return NextResponse.json({ item: updated, payoutResult, ...(warning ? { warning } : {}) });
+    return NextResponse.json({ item: updated });
   } catch (err) {
     console.error("PATCH /api/orders/[id]/items/[itemId] error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

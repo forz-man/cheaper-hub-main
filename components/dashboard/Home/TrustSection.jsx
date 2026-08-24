@@ -7,7 +7,7 @@ const TrustSection = () => {
   const trustItems = [
     { Icon: ShieldCheck, title: "Verified sellers", desc: "Every seller goes through our verification process before going live." },
     { Icon: Star, title: "Real reviews", desc: "Authentic buyer reviews on every product. No fake ratings." },
-    { Icon: CheckCircle, title: "Buyer protection", desc: "Payments held securely until you confirm your order arrived." },
+    { Icon: CheckCircle, title: "Buyer protection", desc: "Payments are processed securely at checkout through Stripe." },
     { Icon: Truck, title: "Fast delivery", desc: "Track your order in real-time from purchase to delivery." },
     { Icon: Headphones, title: "24/7 Support", desc: "Our support team is always here to help you." },
     { Icon: RefreshCw, title: "Easy returns", desc: "Hassle-free returns within 30 days of purchase." },

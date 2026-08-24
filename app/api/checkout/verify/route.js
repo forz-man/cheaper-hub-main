@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server";
 import { getUncachableStripeClient } from "@/lib/stripeClient";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { markOrderPaidAndSendPayouts } from "@/lib/payouts";
 
 // Confirms an order's payment status by asking Stripe directly for the truth
 // (never trusts client-supplied status). Safe to call repeatedly — acts as
@@ -49,14 +50,11 @@ export async function GET(req) {
 
     const paid = session.payment_status === "paid";
 
-    if (paid && existingOrder.payment_status !== "paid") {
-      await admin
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          stripe_payment_intent: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null,
-        })
-        .eq("id", orderId);
+    if (paid) {
+      const paymentIntentId = typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id || null;
+      await markOrderPaidAndSendPayouts({ orderId, paymentIntentId, adminClient: admin, stripeClient: stripe });
     }
 
     return NextResponse.json({

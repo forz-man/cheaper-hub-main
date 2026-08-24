@@ -32,13 +32,13 @@ const approvalConfig = {
 };
 
 const payoutConfig = {
-  pending: { label: "Held by platform", color: "text-amber-700 bg-amber-50 border-amber-100" },
-  released: { label: "Released to you", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+  pending: { label: "Transfer pending", color: "text-amber-700 bg-amber-50 border-amber-100" },
+  released: { label: "Paid to you", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
 };
 
 const NEXT_FULFILLMENT_ACTION = {
   processing: { next: "shipped", label: "Mark shipped" },
-  shipped: { next: "delivered", label: "Mark delivered & release payout" },
+  shipped: { next: "delivered", label: "Mark delivered" },
 };
 
 const CATEGORIES = ["Electronics", "Fashion", "Home & Living", "Food & Bev", "Sports", "Books"];
@@ -479,6 +479,26 @@ export default function VendorDashboard() {
     }
   };
 
+  const handleRetryPayout = async (item) => {
+    setUpdatingItemId(item.id);
+    setOrderActionError(null);
+    setOrderActionWarning(null);
+    try {
+      const res = await fetch(`/api/orders/${item.order_id}/retry-payout`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to retry transfer");
+
+      await loadOrders(user);
+      if (data.payoutResult?.warnings?.length) {
+        setOrderActionWarning(data.payoutResult.warnings.join(" "));
+      }
+    } catch (err) {
+      setOrderActionError(err.message);
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     router.replace("/login");
@@ -748,8 +768,8 @@ export default function VendorDashboard() {
                 {[
                   { label: "Total products", value: productsLoading ? "…" : String(products.length), sub: "Live listings", Icon: Package },
                   { label: "Total orders", value: ordersLoading ? "…" : String(orderItems.length), sub: "Order items", Icon: ShoppingBag },
-                  { label: "Held by platform", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}`, sub: "Released after delivery", Icon: TrendingUp },
-                  { label: "Released to you", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}`, sub: "Total paid out", Icon: Eye },
+                  { label: "Transfer pending", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}`, sub: "Needs payment resolution", Icon: TrendingUp },
+                  { label: "Paid to you", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}`, sub: "Total sent after checkout", Icon: Eye },
                 ].map(s => <StatCard key={s.label} {...s} />)}
               </motion.div>
 
@@ -951,7 +971,7 @@ export default function VendorDashboard() {
                   <TrendingUp size={14} className="text-gray-400" />
                 </div>
                 <div className="text-xs text-gray-500">
-                  Payments are captured to the platform and held. Mark an item <span className="font-semibold text-black">delivered</span> once it&apos;s confirmed received to release your payout for it.
+                  Your payout is sent automatically after Stripe confirms checkout. Mark an item <span className="font-semibold text-black">delivered</span> to keep fulfillment tracking accurate.
                 </div>
               </div>
 
@@ -991,7 +1011,7 @@ export default function VendorDashboard() {
                       const payout = item.payout_status || "pending";
                       const action = NEXT_FULFILLMENT_ACTION[fulfillment];
                       const notPaid = item.order?.payment_status !== "paid";
-                      const canRetryPayout = fulfillment === "delivered" && payout !== "released";
+                      const canRetryPayout = payout !== "released" && Boolean(item.payout_error);
                       return (
                         <tr key={item.id} className="hover:bg-gray-50/80 transition-colors">
                           <td className="px-5 py-4 font-mono text-xs text-gray-400">{item.order_id.slice(0, 8)}…</td>
@@ -1001,11 +1021,12 @@ export default function VendorDashboard() {
                           <td className="px-5 py-4">
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(statusConfig[fulfillment] || statusConfig.processing).color}`}>{(statusConfig[fulfillment] || statusConfig.processing).label}</span>
                           </td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4" title={item.payout_error || undefined}>
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${payoutConfig[payout].color}`}>{payoutConfig[payout].label}</span>
                           </td>
                           <td className="px-5 py-4 text-right">
-                            {action ? (
+                            <div className="flex justify-end gap-2">
+                            {action && (
                               <button
                                 onClick={() => handleUpdateFulfillment(item, action.next)}
                                 disabled={updatingItemId === item.id || (action.next === "delivered" && notPaid)}
@@ -1014,17 +1035,21 @@ export default function VendorDashboard() {
                               >
                                 {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : action.label}
                               </button>
-                            ) : canRetryPayout ? (
+                            )}
+                            {canRetryPayout && (
                               <button
-                                onClick={() => handleUpdateFulfillment(item, "delivered")}
+                                onClick={() => handleRetryPayout(item)}
                                 disabled={updatingItemId === item.id}
-                                className="text-xs font-semibold text-black border border-gray-200 px-3 py-1.5 rounded-xl hover:border-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={item.payout_error}
+                                className="text-xs font-semibold text-amber-700 border border-amber-200 px-3 py-1.5 rounded-xl hover:border-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               >
-                                {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : "Retry payout"}
+                                {updatingItemId === item.id ? <Loader2 size={12} className="animate-spin inline" /> : "Retry transfer"}
                               </button>
-                            ) : (
+                            )}
+                            {!action && !canRetryPayout && (
                               <span className="text-xs text-gray-300">—</span>
                             )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1058,10 +1083,10 @@ export default function VendorDashboard() {
                       </div>
                       <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                         {payoutsReady
-                          ? "Your bank account is connected. When you mark an item delivered on a paid order, we automatically transfer your share to your bank via Stripe."
+                          ? "Your bank account is connected. We automatically send your share after Stripe confirms a paid checkout."
                           : stripeStatus?.connected
                           ? "You've started setup but Stripe still needs a bit more information (identity or bank details) before payouts can go out."
-                          : "Connect a bank account through Stripe so we can pay you automatically once an order is delivered. Money is held by the platform until then."}
+                          : "Connect a bank account through Stripe so we can send your share automatically after checkout."}
                       </p>
 
                       {stripeActionError && (
@@ -1095,7 +1120,7 @@ export default function VendorDashboard() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-white border border-gray-200 rounded-2xl p-5">
-                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Held by platform</div>
+                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Transfer pending</div>
                     <div className="text-xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
                       ${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}
                     </div>
@@ -1109,7 +1134,7 @@ export default function VendorDashboard() {
                 </div>
 
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-xs text-gray-500 leading-relaxed">
-                  How it works: buyers pay the platform at checkout. Once you mark an order item as delivered, we transfer your share straight to your connected bank account via Stripe — no manual invoicing needed.
+                  How it works: buyers pay at checkout and, once Stripe confirms the payment, we send your share to your connected Stripe account. Fulfillment updates do not delay payment.
                 </div>
               </div>
             </motion.div>

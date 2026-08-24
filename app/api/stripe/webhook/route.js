@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripeClient } from "@/lib/stripeClient";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { markOrderPaidAndSendPayouts } from "@/lib/payouts";
 
 // Verifies the Stripe signature (STRIPE_WEBHOOK_SECRET) so only genuine
 // Stripe requests are processed. As a second layer of defense, we still
@@ -59,13 +60,18 @@ export async function POST(req) {
 
       if (orderId && session.payment_status === "paid") {
         const admin = createAdminClient();
-        await admin
-          .from("orders")
-          .update({
-            payment_status: "paid",
-            stripe_payment_intent: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null,
-          })
-          .eq("id", orderId);
+        const paymentIntentId = typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id || null;
+        const payoutResult = await markOrderPaidAndSendPayouts({
+          orderId,
+          paymentIntentId,
+          adminClient: admin,
+          stripeClient: stripe,
+        });
+        if (payoutResult.retryRequired) {
+          throw new Error(`Vendor transfers incomplete for order ${orderId}; requesting Stripe retry.`);
+        }
       }
     }
 

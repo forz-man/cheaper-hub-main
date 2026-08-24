@@ -112,7 +112,7 @@ function OrderSuccessContent({ id }) {
             Order placed!
           </h1>
           <p className="text-sm text-[#888] mb-6">
-            Thanks, {name.split(" ")[0]}. Your card has been charged and the funds are held by Cheaper. Payment is released to the seller only after both you and the seller confirm delivery.
+            Thanks, {name.split(" ")[0]}. Your card has been charged securely, and the seller&apos;s payout is being sent through Stripe.
           </p>
 
           <div className="bg-[#f9f8f6] border border-[#e2ddd6] rounded-xl p-5 mb-6 text-left space-y-3">
@@ -161,12 +161,12 @@ function OrderSuccessContent({ id }) {
             </div>
           </div>
 
-          {/* Payment hold notice */}
+          {/* Payment processing notice */}
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-5 text-left flex items-start gap-2.5">
             <Shield size={14} className="text-indigo-500 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-indigo-700 leading-relaxed">
-              <span className="font-semibold">Your payment is held by Cheaper.</span>{" "}
-              Once the seller ships and marks delivery, go to <strong>My Orders</strong> in your dashboard and tap <strong>&ldquo;Confirm I received this order&rdquo;</strong> — that releases payment to the seller.
+              <span className="font-semibold">Your payment is processed at checkout.</span>{" "}
+              You can still confirm receipt from <strong>My Orders</strong> after delivery to keep your order status up to date.
             </p>
           </div>
 
