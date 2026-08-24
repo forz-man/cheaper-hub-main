@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripeClient } from "@/lib/stripeClient";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { markOrderPaidAndSendPayouts } from "@/lib/payouts";
+import { markOrderPaidAndSendPayouts, processStripeRefundOrDispute } from "@/lib/payouts";
 
 // Verifies the Stripe signature (STRIPE_WEBHOOK_SECRET) so only genuine
 // Stripe requests are processed. As a second layer of defense, we still
@@ -30,9 +30,8 @@ export async function POST(req) {
         return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
       }
     } else {
-      // No webhook secret configured yet — fall back to parsing the body.
-      // Still safe because we re-verify via a live Stripe API call below.
-      event = JSON.parse(rawBody);
+      console.error("stripe webhook rejected: STRIPE_WEBHOOK_SECRET is not configured");
+      return NextResponse.json({ error: "Webhook secret is not configured" }, { status: 500 });
     }
 
     if (event?.type === "account.updated") {
@@ -72,6 +71,41 @@ export async function POST(req) {
         if (payoutResult.retryRequired) {
           throw new Error(`Vendor transfers incomplete for order ${orderId}; requesting Stripe retry.`);
         }
+      }
+    }
+
+    if (event?.type === "charge.refunded") {
+      const chargeId = event.data?.object?.id;
+      const refunds = chargeId ? await stripe.refunds.list({ charge: chargeId, limit: 100 }) : { data: [] };
+      for (const refund of refunds.data || []) {
+        if (refund.status !== "succeeded") continue;
+        const recoveryResult = await processStripeRefundOrDispute({
+          event: {
+            ...event,
+            id: `${event.id}:${refund.id}`,
+            type: "refund.updated",
+            data: { object: refund },
+          },
+          adminClient: createAdminClient(),
+          stripeClient: stripe,
+        });
+        if (recoveryResult.retryRequired) {
+          throw new Error(`Seller payout recovery incomplete for order ${recoveryResult.orderId || "unknown"}; requesting Stripe retry.`);
+        }
+      }
+    } else if (
+      event?.type === "refund.created" ||
+      event?.type === "refund.updated" ||
+      event?.type === "charge.dispute.created" ||
+      event?.type === "charge.dispute.closed"
+    ) {
+      const recoveryResult = await processStripeRefundOrDispute({
+        event,
+        adminClient: createAdminClient(),
+        stripeClient: stripe,
+      });
+      if (recoveryResult.retryRequired) {
+        throw new Error(`Seller payout recovery incomplete for order ${recoveryResult.orderId || "unknown"}; requesting Stripe retry.`);
       }
     }
 

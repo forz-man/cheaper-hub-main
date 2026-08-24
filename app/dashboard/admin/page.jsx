@@ -66,6 +66,13 @@ const paymentStatusConfig = {
   refunded: { label: "Refunded", color: "text-purple-600 bg-purple-50" },
 };
 
+const payoutRecoveryConfig = {
+  recovered: { label: "Payout recovered", color: "text-purple-600 bg-purple-50" },
+  reinstated: { label: "Payout reinstated", color: "text-emerald-600 bg-emerald-50" },
+  needs_support: { label: "Needs support", color: "text-red-600 bg-red-50" },
+  pending: { label: "Recovery pending", color: "text-amber-600 bg-amber-50" },
+};
+
 const SIDEBAR_SECTIONS = [
   { id: "overview", label: "Dashboard", Icon: LayoutDashboard },
   {
@@ -362,7 +369,8 @@ function ProductsSection({ tab }) {
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Category</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Price</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Stock</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Date</th>
+               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Payout recovery</th>
+               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Date</th>
                   {approvalStatus === "approved" && (
                     <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Homepage</th>
                   )}
@@ -540,6 +548,7 @@ function OrdersSection({ filter }) {
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Total</th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Payment</th>
+               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Payout recovery</th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Date</th>
             </tr>
           </thead>
@@ -565,7 +574,19 @@ function OrdersSection({ filter }) {
                     {(paymentStatusConfig[o.payment_status] || paymentStatusConfig.unpaid).label}
                   </span>
                 </td>
-                <td className="px-5 py-4 text-xs text-gray-400 hidden lg:table-cell">{formatDate(o.created_at)}</td>
+                 <td className="px-5 py-4 hidden lg:table-cell">
+                   <div className="flex flex-wrap gap-1">
+                     {(o.order_items || []).filter((item) => item.payout_recovery_status && item.payout_recovery_status !== "none").map((item) => (
+                       <span key={item.id} title={item.payout_recovery_error || undefined} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${(
+                         payoutRecoveryConfig[item.payout_recovery_status] || payoutRecoveryConfig.pending
+                       ).color}`}>
+                         {(payoutRecoveryConfig[item.payout_recovery_status] || payoutRecoveryConfig.pending).label}
+                       </span>
+                     ))}
+                     {!(o.order_items || []).some((item) => item.payout_recovery_status && item.payout_recovery_status !== "none") && <span className="text-xs text-gray-300">—</span>}
+                   </div>
+                 </td>
+                 <td className="px-5 py-4 text-xs text-gray-400 hidden lg:table-cell">{formatDate(o.created_at)}</td>
               </tr>
             ))}
           </tbody>

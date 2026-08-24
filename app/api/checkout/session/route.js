@@ -164,7 +164,10 @@ export async function POST(req) {
       success_url: `${origin}/order-success/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout?cancelled=1`,
       metadata: { order_id: orderId, buyer_id: user.id },
-      payment_intent_data: { transfer_group: orderId },
+      payment_intent_data: {
+        transfer_group: orderId,
+        metadata: { order_id: orderId, buyer_id: user.id },
+      },
     });
 
     // Buyers have no RLS update grant on orders (by design — see schema.sql),

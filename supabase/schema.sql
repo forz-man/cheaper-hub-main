@@ -98,6 +98,9 @@ create table if not exists public.orders (
   shipping_zip text,
   shipping_country text default 'US',
   payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'failed', 'refunded')),
+  payment_issue_status text default 'none' check (payment_issue_status in ('none', 'partially_refunded', 'refunded', 'disputed', 'dispute_won', 'dispute_lost', 'needs_support')),
+  refunded_amount numeric(10,2) not null default 0,
+  disputed_amount numeric(10,2) not null default 0,
   stripe_session_id text,
   stripe_payment_intent text,
   created_at timestamptz default now()
@@ -105,6 +108,9 @@ create table if not exists public.orders (
 
 -- Safe to re-run: add payment columns to pre-existing orders tables.
 alter table public.orders add column if not exists payment_status text default 'unpaid' check (payment_status in ('unpaid', 'paid', 'failed', 'refunded'));
+alter table public.orders add column if not exists payment_issue_status text default 'none' check (payment_issue_status in ('none', 'partially_refunded', 'refunded', 'disputed', 'dispute_won', 'dispute_lost', 'needs_support'));
+alter table public.orders add column if not exists refunded_amount numeric(10,2) not null default 0;
+alter table public.orders add column if not exists disputed_amount numeric(10,2) not null default 0;
 alter table public.orders add column if not exists stripe_session_id text;
 alter table public.orders add column if not exists stripe_payment_intent text;
 
@@ -136,6 +142,10 @@ create table if not exists public.order_items (
   payout_released_at timestamptz,
   payout_attempted_at timestamptz,
   payout_error text,
+  payout_recovery_status text default 'none' check (payout_recovery_status in ('none', 'pending', 'recovered', 'reinstated', 'needs_support')),
+  payout_recovered_amount numeric(10,2) not null default 0,
+  payout_recovered_at timestamptz,
+  payout_recovery_error text,
   created_at timestamptz default now()
 );
 
@@ -146,9 +156,329 @@ alter table public.order_items add column if not exists payout_amount numeric(10
 alter table public.order_items add column if not exists payout_released_at timestamptz;
 alter table public.order_items add column if not exists payout_attempted_at timestamptz;
 alter table public.order_items add column if not exists payout_error text;
+alter table public.order_items add column if not exists payout_recovery_status text default 'none' check (payout_recovery_status in ('none', 'pending', 'recovered', 'reinstated', 'needs_support'));
+alter table public.order_items add column if not exists payout_recovered_amount numeric(10,2) not null default 0;
+alter table public.order_items add column if not exists payout_recovered_at timestamptz;
+alter table public.order_items add column if not exists payout_recovery_error text;
 alter table public.order_items add column if not exists created_at timestamptz default now();
 -- Stripe Transfer id once a vendor's payout has actually been sent via Connect.
 alter table public.order_items add column if not exists stripe_transfer_id text;
+
+-- Stripe webhook records and one recovery row per adjustment/item. The unique
+-- adjustment key is the database-side retry guard; Stripe idempotency protects
+-- the corresponding transfer reversal request.
+create table if not exists public.stripe_payment_events (
+  id uuid default gen_random_uuid() primary key,
+  stripe_event_id text not null unique,
+  event_type text not null,
+  stripe_payment_intent_id text,
+  stripe_charge_id text,
+  stripe_adjustment_id text not null,
+  order_id uuid references public.orders(id) on delete set null,
+  status text not null default 'processing' check (status in ('processing', 'processed', 'needs_support', 'ignored')),
+  amount_cents integer not null default 0,
+  currency text default 'usd',
+  error text,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  processed_at timestamptz
+);
+
+create index if not exists stripe_payment_events_order_idx
+  on public.stripe_payment_events(order_id, created_at desc);
+create index if not exists stripe_payment_events_adjustment_idx
+  on public.stripe_payment_events(stripe_adjustment_id);
+
+create table if not exists public.payout_recovery_events (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.orders(id) on delete cascade not null,
+  order_item_id uuid references public.order_items(id) on delete cascade not null,
+  vendor_id uuid references auth.users(id) on delete set null,
+  stripe_event_id text not null,
+  stripe_adjustment_id text not null,
+  event_type text not null check (event_type in ('refund', 'dispute')),
+  amount_cents integer not null check (amount_cents >= 0),
+  stripe_transfer_id text not null,
+  stripe_transfer_reversal_id text,
+  stripe_reinstatement_transfer_id text,
+  status text not null default 'pending' check (status in ('pending', 'recovered', 'reinstated', 'needs_support', 'not_applicable')),
+  error text,
+  created_at timestamptz default now(),
+  resolved_at timestamptz,
+  unique (stripe_event_id, order_item_id),
+  unique (stripe_adjustment_id, order_item_id)
+);
+
+create index if not exists payout_recovery_events_order_idx
+  on public.payout_recovery_events(order_id, created_at desc);
+create index if not exists payout_recovery_events_vendor_idx
+  on public.payout_recovery_events(vendor_id, created_at desc);
+
+-- A canonical Stripe adjustment exists even when an order had no released
+-- transfers. This makes order-level refund/dispute accounting exactly-once.
+create table if not exists public.stripe_payment_adjustments (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.orders(id) on delete cascade not null,
+  stripe_adjustment_id text not null unique,
+  event_type text not null check (event_type in ('refund', 'dispute')),
+  amount_cents integer not null check (amount_cents >= 0),
+  created_at timestamptz default now()
+);
+
+create index if not exists stripe_payment_adjustments_order_idx
+  on public.stripe_payment_adjustments(order_id, created_at desc);
+
+alter table public.stripe_payment_events enable row level security;
+alter table public.payout_recovery_events enable row level security;
+alter table public.stripe_payment_adjustments enable row level security;
+
+-- Atomically reserve the remaining recovery capacity before any Stripe API
+-- call. This protects overlapping webhooks for different partial refunds from
+-- reversing a transfer beyond its original amount.
+create or replace function public.claim_payout_recovery(
+  p_order_id uuid,
+  p_order_item_id uuid,
+  p_vendor_id uuid,
+  p_stripe_event_id text,
+  p_stripe_adjustment_id text,
+  p_event_type text,
+  p_requested_amount_cents integer,
+  p_stripe_transfer_id text
+) returns public.payout_recovery_events
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_recovery public.payout_recovery_events;
+  payout_cents integer;
+  already_claimed_cents integer;
+  claim_cents integer;
+  created_recovery public.payout_recovery_events;
+begin
+  select * into existing_recovery
+  from public.payout_recovery_events
+  where stripe_adjustment_id = p_stripe_adjustment_id
+    and order_item_id = p_order_item_id;
+  if found then return existing_recovery; end if;
+
+  perform 1 from public.order_items
+  where id = p_order_item_id
+    and order_id = p_order_id
+    and vendor_id is not distinct from p_vendor_id
+    and stripe_transfer_id = p_stripe_transfer_id
+    and payout_status = 'released'
+  for update;
+  if not found then raise exception 'Order item % was not found', p_order_item_id; end if;
+
+  select coalesce(round(payout_amount * 100)::integer, 0) into payout_cents
+  from public.order_items where id = p_order_item_id;
+  select coalesce(sum(amount_cents), 0) into already_claimed_cents
+  from public.payout_recovery_events
+  where order_item_id = p_order_item_id
+    and status in ('pending', 'recovered', 'needs_support');
+
+  claim_cents := greatest(0, least(coalesce(p_requested_amount_cents, 0), payout_cents - already_claimed_cents));
+  insert into public.payout_recovery_events (
+    order_id, order_item_id, vendor_id, stripe_event_id, stripe_adjustment_id,
+    event_type, amount_cents, stripe_transfer_id, status
+  ) values (
+    p_order_id, p_order_item_id, p_vendor_id, p_stripe_event_id, p_stripe_adjustment_id,
+    p_event_type, claim_cents, p_stripe_transfer_id,
+    case when claim_cents > 0 then 'pending' else 'not_applicable' end
+  ) returning * into created_recovery;
+
+  if claim_cents > 0 then
+    update public.order_items set payout_recovery_status = 'pending' where id = p_order_item_id;
+  end if;
+  return created_recovery;
+end;
+$$;
+
+create or replace function public.claim_stripe_payment_adjustment(
+  p_order_id uuid,
+  p_stripe_adjustment_id text,
+  p_event_type text,
+  p_amount_cents integer
+) returns table(amount_cents integer, is_new boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_adjustment public.stripe_payment_adjustments;
+begin
+  if p_event_type not in ('refund', 'dispute') then
+    raise exception 'Invalid payment adjustment type';
+  end if;
+
+  perform 1 from public.orders where id = p_order_id for update;
+  if not found then raise exception 'Order % was not found', p_order_id; end if;
+
+  select * into existing_adjustment
+  from public.stripe_payment_adjustments
+  where stripe_adjustment_id = p_stripe_adjustment_id;
+  if found then
+    return query select existing_adjustment.amount_cents, false;
+    return;
+  end if;
+
+  insert into public.stripe_payment_adjustments (
+    order_id, stripe_adjustment_id, event_type, amount_cents
+  ) values (
+    p_order_id, p_stripe_adjustment_id, p_event_type, greatest(0, coalesce(p_amount_cents, 0))
+  );
+
+  if p_event_type = 'refund' then
+    update public.orders
+    set refunded_amount = refunded_amount + (greatest(0, coalesce(p_amount_cents, 0))::numeric / 100),
+        payment_status = case
+          when refunded_amount + (greatest(0, coalesce(p_amount_cents, 0))::numeric / 100) >= total then 'refunded'
+          when payment_status = 'unpaid' then 'paid'
+          else payment_status
+        end,
+        payment_issue_status = case
+          when payment_issue_status = 'needs_support' then 'needs_support'
+          when refunded_amount + (greatest(0, coalesce(p_amount_cents, 0))::numeric / 100) >= total then 'refunded'
+          else 'partially_refunded'
+        end
+    where id = p_order_id;
+  else
+    update public.orders
+    set disputed_amount = disputed_amount + (greatest(0, coalesce(p_amount_cents, 0))::numeric / 100)
+    where id = p_order_id;
+  end if;
+  return query select greatest(0, coalesce(p_amount_cents, 0)), true;
+end;
+$$;
+
+create or replace function public.finalize_payout_recovery(
+  p_recovery_id uuid,
+  p_status text,
+  p_stripe_transfer_reversal_id text,
+  p_error text
+) returns public.payout_recovery_events
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recovery public.payout_recovery_events;
+  recovered_cents integer;
+  has_support boolean;
+begin
+  if p_status not in ('recovered', 'needs_support') then
+    raise exception 'Invalid payout recovery status';
+  end if;
+  select * into recovery from public.payout_recovery_events where id = p_recovery_id for update;
+  if not found then raise exception 'Payout recovery % was not found', p_recovery_id; end if;
+  perform 1 from public.order_items where id = recovery.order_item_id for update;
+
+  update public.payout_recovery_events
+  set status = p_status,
+      stripe_transfer_reversal_id = case when p_status = 'recovered' then p_stripe_transfer_reversal_id else stripe_transfer_reversal_id end,
+      error = case when p_status = 'recovered' then null else p_error end,
+      resolved_at = now()
+  where id = p_recovery_id
+  returning * into recovery;
+
+  select coalesce(sum(amount_cents), 0) into recovered_cents
+  from public.payout_recovery_events
+  where order_item_id = recovery.order_item_id and status = 'recovered';
+  select exists(
+    select 1 from public.payout_recovery_events
+    where order_item_id = recovery.order_item_id and status = 'needs_support'
+  ) into has_support;
+  update public.order_items
+  set payout_recovered_amount = recovered_cents::numeric / 100,
+      payout_recovered_at = case when p_status = 'recovered' then now() else payout_recovered_at end,
+      payout_recovery_status = case when has_support then 'needs_support' when recovered_cents > 0 then 'recovered' else 'none' end,
+      payout_recovery_error = case when has_support then p_error else null end
+  where id = recovery.order_item_id;
+  return recovery;
+end;
+$$;
+
+create or replace function public.reinstate_payout_recovery(
+  p_recovery_id uuid,
+  p_stripe_reinstatement_transfer_id text
+) returns public.payout_recovery_events
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recovery public.payout_recovery_events;
+  recovered_cents integer;
+  has_support boolean;
+begin
+  select * into recovery from public.payout_recovery_events where id = p_recovery_id for update;
+  if not found then raise exception 'Payout recovery % was not found', p_recovery_id; end if;
+  perform 1 from public.order_items where id = recovery.order_item_id for update;
+
+  update public.payout_recovery_events
+  set status = 'reinstated',
+      stripe_reinstatement_transfer_id = p_stripe_reinstatement_transfer_id,
+      error = null,
+      resolved_at = now()
+  where id = p_recovery_id
+  returning * into recovery;
+
+  select coalesce(sum(amount_cents), 0) into recovered_cents
+  from public.payout_recovery_events
+  where order_item_id = recovery.order_item_id and status = 'recovered';
+  select exists(
+    select 1 from public.payout_recovery_events
+    where order_item_id = recovery.order_item_id and status = 'needs_support'
+  ) into has_support;
+  update public.order_items
+  set payout_recovered_amount = recovered_cents::numeric / 100,
+      payout_recovery_status = case when has_support then 'needs_support' when recovered_cents > 0 then 'recovered' else 'reinstated' end,
+      payout_recovery_error = null
+  where id = recovery.order_item_id;
+  return recovery;
+end;
+$$;
+
+create or replace function public.mark_payout_reinstatement_failure(
+  p_recovery_id uuid,
+  p_error text
+) returns public.payout_recovery_events
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recovery public.payout_recovery_events;
+begin
+  select * into recovery from public.payout_recovery_events where id = p_recovery_id for update;
+  if not found then raise exception 'Payout recovery % was not found', p_recovery_id; end if;
+  if recovery.status <> 'recovered' then
+    raise exception 'Only recovered payouts can be reinstated';
+  end if;
+  perform 1 from public.order_items where id = recovery.order_item_id for update;
+  update public.payout_recovery_events
+  set error = p_error
+  where id = p_recovery_id
+  returning * into recovery;
+  update public.order_items
+  set payout_recovery_status = 'needs_support',
+      payout_recovery_error = p_error
+  where id = recovery.order_item_id;
+  return recovery;
+end;
+$$;
+
+revoke execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text) from public, anon, authenticated;
+revoke execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) from public, anon, authenticated;
+revoke execute on function public.finalize_payout_recovery(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function public.reinstate_payout_recovery(uuid, text) from public, anon, authenticated;
+revoke execute on function public.mark_payout_reinstatement_failure(uuid, text) from public, anon, authenticated;
+grant execute on function public.claim_payout_recovery(uuid, uuid, uuid, text, text, text, integer, text) to service_role;
+grant execute on function public.claim_stripe_payment_adjustment(uuid, text, text, integer) to service_role;
+grant execute on function public.finalize_payout_recovery(uuid, text, text, text) to service_role;
+grant execute on function public.reinstate_payout_recovery(uuid, text) to service_role;
+grant execute on function public.mark_payout_reinstatement_failure(uuid, text) to service_role;
 
 alter table public.order_items enable row level security;
 

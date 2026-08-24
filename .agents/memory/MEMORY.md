@@ -1,5 +1,6 @@
 - [Marketplace Stripe checkout](marketplace-stripe-checkout.md) — ad-hoc price_data Checkout Sessions instead of stripe-replit-sync, since Supabase (not Stripe) is the product catalog source of truth.
 - [Stripe Connect vendor payouts](stripe-connect-payouts.md) — Express accounts + transfers from platform balance, idempotency keys for dedupe, and the RLS column-privilege pattern needed to stop cross-role column writes.
+- [Payout recovery consistency](payout-recovery-consistency.md) — treat Stripe refund/dispute events as canonical adjustment records and reserve recovery capacity atomically before calling Stripe.
 - [Supabase new-format API keys](supabase-key-format.md) — sb_publishable_/sb_secret_ prefixes distinguish anon vs service-role; a wrong-key mix-up silently breaks admin operations like RLS bypass.
 - [External Supabase schema changes](external-supabase-schema-changes.md) — agent has no DB password for the user's external Supabase, so table/column DDL must be handed to the user as SQL to run themselves, not applied programmatically.
 - [Public npm lockfiles](public-npm-lockfiles.md) — shared deployments need a public-registry lockfile, never Replit firewall tarball URLs.

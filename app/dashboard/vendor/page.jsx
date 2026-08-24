@@ -36,6 +36,13 @@ const payoutConfig = {
   released: { label: "Paid to you", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
 };
 
+const payoutRecoveryConfig = {
+  pending: { label: "Recovery pending", color: "text-amber-700 bg-amber-50 border-amber-100" },
+  recovered: { label: "Payout recovered", color: "text-purple-700 bg-purple-50 border-purple-100" },
+  reinstated: { label: "Payout reinstated", color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+  needs_support: { label: "Needs support", color: "text-red-700 bg-red-50 border-red-100" },
+};
+
 const NEXT_FULFILLMENT_ACTION = {
   processing: { next: "shipped", label: "Mark shipped" },
   shipped: { next: "delivered", label: "Mark delivered" },
@@ -769,7 +776,7 @@ export default function VendorDashboard() {
                   { label: "Total products", value: productsLoading ? "…" : String(products.length), sub: "Live listings", Icon: Package },
                   { label: "Total orders", value: ordersLoading ? "…" : String(orderItems.length), sub: "Order items", Icon: ShoppingBag },
                   { label: "Transfer pending", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status !== "released").reduce((s, i) => s + Number(i.subtotal), 0).toFixed(2)}`, sub: "Needs payment resolution", Icon: TrendingUp },
-                  { label: "Paid to you", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}`, sub: "Total sent after checkout", Icon: Eye },
+                   { label: "Paid to you", value: ordersLoading ? "…" : `${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal) - Number(i.payout_recovered_amount || 0), 0).toFixed(2)}`, sub: "Net after refunds and disputes", Icon: Eye },
                 ].map(s => <StatCard key={s.label} {...s} />)}
               </motion.div>
 
@@ -1008,7 +1015,8 @@ export default function VendorDashboard() {
                       <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">No orders yet</td></tr>
                     ) : orderItems.map((item) => {
                       const fulfillment = item.fulfillment_status || "processing";
-                      const payout = item.payout_status || "pending";
+                       const payout = item.payout_status || "pending";
+                       const recovery = item.payout_recovery_status || "none";
                       const action = NEXT_FULFILLMENT_ACTION[fulfillment];
                       const notPaid = item.order?.payment_status !== "paid";
                       const canRetryPayout = payout !== "released" && Boolean(item.payout_error);
@@ -1021,8 +1029,15 @@ export default function VendorDashboard() {
                           <td className="px-5 py-4">
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(statusConfig[fulfillment] || statusConfig.processing).color}`}>{(statusConfig[fulfillment] || statusConfig.processing).label}</span>
                           </td>
-                          <td className="px-5 py-4" title={item.payout_error || undefined}>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${payoutConfig[payout].color}`}>{payoutConfig[payout].label}</span>
+                           <td className="px-5 py-4" title={item.payout_recovery_error || item.payout_error || undefined}>
+                             <div className="flex flex-col items-start gap-1">
+                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(payoutConfig[payout] || payoutConfig.pending).color}`}>{(payoutConfig[payout] || payoutConfig.pending).label}</span>
+                               {recovery !== "none" && (
+                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${(payoutRecoveryConfig[recovery] || payoutRecoveryConfig.pending).color}`}>
+                                   {(payoutRecoveryConfig[recovery] || payoutRecoveryConfig.pending).label}
+                                 </span>
+                               )}
+                             </div>
                           </td>
                           <td className="px-5 py-4 text-right">
                             <div className="flex justify-end gap-2">
@@ -1128,13 +1143,13 @@ export default function VendorDashboard() {
                   <div className="bg-white border border-gray-200 rounded-2xl p-5">
                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Paid out to you</div>
                     <div className="text-xl font-bold text-black" style={{ fontFamily: "var(--font-hanken), sans-serif" }}>
-                      ${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal), 0).toFixed(2)}
+                       ${orderItems.filter(i => i.payout_status === "released").reduce((s, i) => s + Number(i.payout_amount || i.subtotal) - Number(i.payout_recovered_amount || 0), 0).toFixed(2)}
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-xs text-gray-500 leading-relaxed">
-                  How it works: buyers pay at checkout and, once Stripe confirms the payment, we send your share to your connected Stripe account. Fulfillment updates do not delay payment.
+                   How it works: buyers pay at checkout and, once Stripe confirms the payment, we send your share to your connected Stripe account. If a payment is refunded or disputed, Stripe reverses the related transfer when possible. Any recovery issue is shown on the order and needs support review.
                 </div>
               </div>
             </motion.div>

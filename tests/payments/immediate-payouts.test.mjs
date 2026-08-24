@@ -45,3 +45,22 @@ test("checkout and both payment-confirmation paths use the immediate payout serv
   assert.match(webhook, /retryRequired/);
   assert.match(retryRoute, /vendorId:\s*user\.id/);
 });
+
+test("refunds and disputes use an auditable, item-level transfer-reversal ledger", async () => {
+  const [payouts, webhook, schema] = await Promise.all([
+    readFile("lib/payouts.js", "utf8"),
+    readFile("app/api/stripe/webhook/route.js", "utf8"),
+    readFile("supabase/migrations/immediate_vendor_payouts.sql", "utf8"),
+  ]);
+
+  assert.match(payouts, /processStripeRefundOrDispute/);
+  assert.match(payouts, /transfers\.createReversal/);
+  assert.match(payouts, /idempotencyKey:\s*`payout-recovery-\$\{eventRecord\.stripe_adjustment_id\}-\$\{allocation\.id\}`/);
+  assert.match(payouts, /payout_recovery_events/);
+  assert.match(payouts, /allocatePayoutRecoveryCents/);
+  assert.match(webhook, /charge\.refunded/);
+  assert.match(webhook, /charge\.dispute\.created/);
+  assert.match(schema, /stripe_payment_events/);
+  assert.match(schema, /UNIQUE \(stripe_adjustment_id, order_item_id\)/);
+  assert.match(schema, /payout_recovery_status/);
+});
