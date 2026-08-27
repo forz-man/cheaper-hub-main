@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import { 
-  FaFacebook, FaTwitter, FaInstagram, FaYoutube, 
-  FaLinkedin, FaGithub 
+  FaTwitter, FaInstagram, FaLinkedin
 } from 'react-icons/fa';
 import { 
   FiMail, FiSend, FiShield, FiHeart, FiMapPin, 
@@ -68,12 +67,9 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { Icon: FaFacebook, href: "https://facebook.com", label: "Facebook" },
     { Icon: FaTwitter, href: "https://twitter.com", label: "Twitter" },
     { Icon: FaInstagram, href: "https://instagram.com", label: "Instagram" },
-    { Icon: FaYoutube, href: "https://youtube.com", label: "Youtube" },
     { Icon: FaLinkedin, href: "https://linkedin.com", label: "LinkedIn" },
-    { Icon: FaGithub, href: "https://github.com", label: "GitHub" },
   ];
 
   return (
