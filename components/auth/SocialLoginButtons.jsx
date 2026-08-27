@@ -1,6 +1,6 @@
 "use client";
 
-import { loginWithGoogle, loginWithApple } from "@/lib/auth";
+import { loginWithGoogle } from "@/lib/auth";
 
 function GoogleIcon() {
   return (
@@ -13,14 +13,6 @@ function GoogleIcon() {
   );
 }
 
-function AppleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14.93 9.546c-.02-2.017 1.648-2.99 1.723-3.037-0.94-1.373-2.4-1.561-2.917-1.578-1.242-.126-2.43.733-3.061.733-.63 0-1.604-.717-2.639-.697-1.353.02-2.607.787-3.301 1.994-1.41 2.443-.362 6.063 1.012 8.046.672.968 1.473 2.053 2.524 2.013 1.014-.04 1.396-.652 2.621-.652 1.226 0 1.571.652 2.641.63 1.09-.018 1.777-.984 2.445-1.954.773-1.12 1.09-2.21 1.107-2.267-.024-.01-2.12-.813-2.155-3.23ZM12.89 3.348c.557-.676.934-1.613.831-2.548-.804.033-1.779.536-2.355 1.21-.517.598-.97 1.556-.848 2.472.897.069 1.815-.456 2.372-1.134Z" fill="currentColor"/>
-    </svg>
-  );
-}
-
 export default function SocialLoginButtons({ role, signup = false }) {
   const handleGoogle = async () => {
     console.log("[SocialLoginButtons] Google clicked, role:", role);
@@ -29,27 +21,14 @@ export default function SocialLoginButtons({ role, signup = false }) {
     else console.log("[SocialLoginButtons] Google OAuth initiated");
   };
 
-  const handleApple = async () => {
-    console.log("[SocialLoginButtons] Apple clicked, role:", role);
-    const { error } = await loginWithApple(role, { signup });
-    if (error) console.warn("Apple login error:", error.message);
-  };
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3">
       <button
         onClick={handleGoogle}
         className="flex items-center justify-center gap-2 h-12 rounded-xl border border-gray-200 font-medium hover:bg-gray-50 transition"
       >
         <GoogleIcon />
         Continue with Google
-      </button>
-      <button
-        onClick={handleApple}
-        className="flex items-center justify-center gap-2 h-12 rounded-xl border border-gray-200 font-medium hover:bg-gray-50 transition"
-      >
-        <AppleIcon />
-        Continue with Apple
       </button>
     </div>
   );
