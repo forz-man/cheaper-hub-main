@@ -96,7 +96,7 @@ function MarketplaceContent() {
         const { data: profiles } = vendorIds.length
           ? await supabase
               .from("profiles")
-              .select("id, store_name, full_name, avatar_url")
+              .select("*")
               .in("id", vendorIds)
           : { data: [] };
         let liveProducts = mergeVendorProfiles(data, profiles || []);

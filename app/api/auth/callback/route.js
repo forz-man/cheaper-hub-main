@@ -150,7 +150,10 @@ export async function GET(request) {
     }
   }
 
-  const dest = isSafeReturnTo(next) ? next : destinationForRole(role);
+  const defaultDestination = role === "vendor" && isSignup
+    ? "/vendor/profile?verify=1"
+    : destinationForRole(role);
+  const dest = isSafeReturnTo(next) ? next : defaultDestination;
   console.log("[auth/callback] Redirecting to:", dest, "role:", role);
 
   const response = NextResponse.redirect(new URL(dest, origin));

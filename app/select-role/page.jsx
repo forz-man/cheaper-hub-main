@@ -33,7 +33,7 @@ function SelectRoleContent() {
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Account type could not be saved");
 
-        router.replace(role === "vendor" ? "/dashboard/vendor" : "/dashboard/buyer");
+        router.replace(role === "vendor" ? "/vendor/profile?verify=1" : "/dashboard/buyer");
       } catch {
         setError("Something went wrong. Please try again.");
         setLoading(null);

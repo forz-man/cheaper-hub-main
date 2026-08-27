@@ -13,6 +13,8 @@ import {
   FileText, Camera, Upload
 } from "lucide-react";
 import { getUserInitial } from "@/lib/utils";
+import VerifiedSellerBadge from "@/components/VerifiedSellerBadge";
+import VerificationModal from "@/components/vendor/VerificationModal";
 
 export default function VendorProfilePage() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function VendorProfilePage() {
   const [editForm, setEditForm] = useState({});
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   // Dynamic Performance Metrics State
   const [performance, setPerformance] = useState({
@@ -144,6 +147,9 @@ export default function VendorProfilePage() {
       const tabParam = params.get("tab");
       if (tabParam && ["Overview", "Activity", "Settings"].includes(tabParam)) {
         setActiveTab(tabParam);
+      }
+      if (params.get("verify") === "1") {
+        setShowVerificationModal(true);
       }
     }
   }, []);
@@ -315,6 +321,10 @@ export default function VendorProfilePage() {
                 
                 {/* Badges */}
                 <div className="flex flex-wrap justify-center sm:justify-start gap-1.5">
+                  <VerifiedSellerBadge
+                    sellerType={profile?.seller_type}
+                    verificationStatus={profile?.verification_status}
+                  />
                   {profile?.badges?.map((badge, idx) => {
                     const Icon = badge.includes("Email") ? ShieldCheck : badge.includes("Phone") ? PhoneCall : Award;
                     const badgeClass = badge.includes("Preferred") 
@@ -342,7 +352,28 @@ export default function VendorProfilePage() {
               </div>
             </div>
 
-            <div className="flex justify-center flex-shrink-0">
+            <div className="flex flex-wrap justify-center gap-2 flex-shrink-0">
+              {!isEditing && (
+                <button
+                  onClick={() => setShowVerificationModal(true)}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm border ${
+                    profile?.verification_status === "approved"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                      : profile?.verification_status === "pending"
+                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <ShieldCheck size={14} />
+                  {profile?.verification_status === "approved"
+                    ? "Verified"
+                    : profile?.verification_status === "pending"
+                      ? "Verification pending"
+                      : profile?.verification_status === "declined"
+                        ? "Resubmit verification"
+                        : "Get verified"}
+                </button>
+              )}
               {isEditing ? (
                 <div className="flex gap-2">
                   <button onClick={handleSave} className="bg-black text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1.5 shadow-sm">
@@ -571,6 +602,13 @@ export default function VendorProfilePage() {
         )}
 
       </div>
+
+      <VerificationModal
+        open={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        profile={profile}
+        onSubmitted={(updates) => setProfile((current) => ({ ...current, ...updates }))}
+      />
 
       {/* ── IMAGE CROPPER MODAL ── */}
       {showCropModal && (

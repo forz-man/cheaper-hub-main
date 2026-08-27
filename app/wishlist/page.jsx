@@ -107,7 +107,7 @@ const WishlistCard = ({ product, imageUrl, hasImage, discount, isOutOfStock, onR
       <div className="p-4">
         <div className="flex items-center justify-between mb-1">
           <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
-            {product.vendor_name || "Verified Seller"}
+            {product.vendor_name || "Marketplace Seller"}
           </p>
         </div>
         

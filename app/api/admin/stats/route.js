@@ -34,7 +34,7 @@ export async function GET() {
       admin.from("profiles").select("*", { count: "exact", head: true }),
       admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor"),
       admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "buyer"),
-      admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor").is("stripe_account_id", null),
+      admin.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor").eq("verification_status", "pending"),
       admin.from("orders").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
     ]);
 

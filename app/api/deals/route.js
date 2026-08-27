@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
+import { mergeVendorProfiles } from "@/lib/vendor-display";
 
 // GET /api/deals — active products that are genuinely marked down
 // (original_price > price), enriched with a real discount percentage and a
@@ -50,7 +51,15 @@ export async function GET() {
       }
     }
 
-    const enriched = deals.map((d) => ({ ...d, sold_count: soldMap[d.id] || 0 }));
+    const vendorIds = [...new Set(deals.map((deal) => deal.vendor_id).filter(Boolean))];
+    const { data: profiles } = vendorIds.length
+      ? await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", vendorIds)
+      : { data: [] };
+    const enriched = mergeVendorProfiles(deals, profiles || [])
+      .map((deal) => ({ ...deal, sold_count: soldMap[deal.id] || 0 }));
 
     return NextResponse.json(enriched, { status: 200 });
   } catch (err) {

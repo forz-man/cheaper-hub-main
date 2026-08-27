@@ -9,7 +9,7 @@ import {
   Bell, Settings, LogOut, Search, ChevronDown, Loader2, AlertTriangle,
   CheckCircle2, XCircle, Clock, Eye, DollarSign, Activity, Shield,
   Menu, X, RefreshCw, Ban, Trash2, Undo2, ChevronLeft,
-  ChevronRight, Star, ShoppingCart,
+  ChevronRight, Star, ShoppingCart, UserRound,
 } from "lucide-react";
 import useNotifications from "@/hooks/useNotifications";
 
@@ -193,7 +193,7 @@ function OverviewSection() {
     { label: "Orders", value: formatNumber(stats?.totalOrders), sub: `${formatNumber(stats?.pendingOrders)} pending`, Icon: ShoppingBag, color: "bg-blue-600" },
     { label: "Products", value: formatNumber(stats?.totalProducts), sub: `${formatNumber(stats?.pendingProducts)} pending approval`, Icon: Package, color: "bg-amber-600" },
     { label: "Customers", value: formatNumber(stats?.buyerCount), sub: `${formatNumber(stats?.activeUsers)} active (30d)`, Icon: Users, color: "bg-purple-600" },
-    { label: "Vendors", value: formatNumber(stats?.vendorCount), sub: `${formatNumber(stats?.pendingVendors)} need onboarding`, Icon: Store, color: "bg-indigo-600" },
+    { label: "Vendors", value: formatNumber(stats?.vendorCount), sub: `${formatNumber(stats?.pendingVendors)} pending verification`, Icon: Store, color: "bg-indigo-600" },
     { label: "Refund Requests", value: formatNumber(stats?.refundRequests), Icon: AlertTriangle, color: "bg-red-600", sub: "Needs attention" },
     { label: "Low Stock", value: formatNumber(stats?.lowStockCount), Icon: AlertTriangle, color: "bg-orange-600", sub: "Products under 5 units" },
     { label: "Today Orders", value: formatNumber(stats?.todayOrders), sub: `${formatCurrency(stats?.todayRevenue)} revenue`, Icon: Activity, color: "bg-teal-600" },
@@ -861,20 +861,73 @@ function UsersSection({ filter }) {
 }
 
 function VendorsSection() {
-  const [vendors, setVendors] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [status, setStatus] = useState("pending");
+  const [sellerType, setSellerType] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [declineModal, setDeclineModal] = useState(null);
+  const [declineReason, setDeclineReason] = useState("");
+  const limit = 20;
 
-  useEffect(() => {
+  const loadSubmissions = useCallback(() => {
     let cancelled = false;
     setLoading(true);
-    fetch("/api/admin/vendors")
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((data) => { if (!cancelled) setVendors(data.vendors || []); })
-      .catch(() => { if (!cancelled) setError("Failed to load vendors"); })
+    setError(null);
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status) params.set("status", status);
+    if (sellerType) params.set("seller_type", sellerType);
+    if (search.trim()) params.set("q", search.trim());
+
+    fetch(`/api/admin/vendor-verifications?${params}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Failed to load verification submissions");
+        return data;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setSubmissions(data.submissions || []);
+          setTotal(data.total || 0);
+        }
+      })
+      .catch((loadError) => { if (!cancelled) setError(loadError.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [page, search, sellerType, status]);
+
+  useEffect(() => loadSubmissions(), [loadSubmissions]);
+
+  const review = async (submission, decision) => {
+    setActionLoading(submission.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/vendor-verifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submission_id: submission.id,
+          decision,
+          decline_reason: decision === "declined" ? declineReason : undefined,
+          expected_updated_at: submission.updated_at,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Review action failed");
+      setSubmissions((current) => current.filter((item) => item.id !== submission.id));
+      setTotal((current) => Math.max(0, current - 1));
+      setDeclineModal(null);
+      setDeclineReason("");
+    } catch (reviewError) {
+      setError(reviewError.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -884,65 +937,206 @@ function VendorsSection() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-        <AlertTriangle size={24} className="mx-auto mb-2 text-red-500" />
-        <p className="text-sm text-red-700">{error}</p>
-      </div>
-    );
-  }
-
-  if (vendors.length === 0) {
-    return (
-      <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center shadow-sm">
-        <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Store size={24} className="text-gray-300" />
-        </div>
-        <p className="text-sm font-semibold text-black mb-1">No vendors found</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Store</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden sm:table-cell">Email</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Products</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden md:table-cell">Stripe</th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide hidden lg:table-cell">Joined</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {vendors.map((v) => (
-              <tr key={v.id} className="hover:bg-gray-50/80 transition-colors">
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                      {v.full_name?.[0] || "S"}
-                    </div>
-                    <div className="font-medium text-black">{v.full_name || "—"}</div>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">{v.email || "—"}</td>
-                <td className="px-5 py-4 font-semibold text-black">{v.product_count || 0}</td>
-                <td className="px-5 py-4 hidden md:table-cell">
-                  {v.stripe_account_id ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Connected</span>
-                  ) : (
-                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Not set up</span>
-                  )}
-                </td>
-                <td className="px-5 py-4 text-xs text-gray-400 hidden lg:table-cell">{formatDate(v.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div>
+      <div className="mb-5 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: "pending", label: "Pending review" },
+            { value: "approved", label: "Approved" },
+            { value: "declined", label: "Declined" },
+          ].map((item) => (
+            <button
+              key={item.value}
+              onClick={() => { setStatus(item.value); setPage(1); }}
+              className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                status === item.value ? "bg-black text-white" : "border border-gray-200 bg-white text-gray-500 hover:border-gray-400"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} placeholder="Search vendor submissions…" />
+          <select
+            value={sellerType}
+            onChange={(event) => { setSellerType(event.target.value); setPage(1); }}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-semibold text-gray-600 outline-none focus:border-black"
+          >
+            <option value="">All seller types</option>
+            <option value="individual">Individuals</option>
+            <option value="business">Businesses / Stores</option>
+          </select>
+        </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{error}</div>
+      )}
+
+      {submissions.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-50">
+            <Shield size={24} className="text-gray-300" />
+          </div>
+          <p className="mb-1 text-sm font-semibold text-black">No {status} verification submissions</p>
+          <p className="text-xs text-gray-400">Try another seller type or status filter.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {submissions.map((submission) => {
+            const business = submission.seller_type === "business";
+            const checklist = business
+              ? [
+                  ["Identity document supplied", !!submission.identity_document_url],
+                  ["Business name supplied", !!submission.store_name],
+                  ["Registration details supplied", !!submission.business_registration_details],
+                  ["Category supplied", !!submission.business_category],
+                  ["Phone supplied", !!submission.phone_number],
+                ]
+              : [
+                  ["Identity document supplied", !!submission.identity_document_url],
+                  ["Full name supplied", !!submission.full_name],
+                  ["Phone supplied", !!submission.phone_number],
+                  ["City / area supplied", !!submission.location],
+                ];
+
+            return (
+              <div key={submission.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col justify-between gap-5 lg:flex-row">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${business ? "bg-indigo-50 text-indigo-700" : "bg-emerald-50 text-emerald-700"}`}>
+                        {business ? <Store size={17} /> : <UserRound size={17} />}
+                      </div>
+                      <div>
+                        <div className="font-bold text-black">{submission.store_name || submission.full_name}</div>
+                        <div className="text-xs text-gray-400">{submission.vendor_email || submission.phone_number}</div>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${business ? "bg-indigo-50 text-indigo-700" : "bg-emerald-50 text-emerald-700"}`}>
+                        {business ? "Business / Store" : "Individual"}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        submission.status === "approved"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : submission.status === "declined"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {submission.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                      <div><span className="text-gray-400">Full name</span><div className="mt-0.5 font-semibold text-black">{submission.full_name}</div></div>
+                      <div><span className="text-gray-400">Phone</span><div className="mt-0.5 font-semibold text-black">{submission.phone_number}</div></div>
+                      <div><span className="text-gray-400">Location</span><div className="mt-0.5 font-semibold text-black">{submission.location}</div></div>
+                      {business && (
+                        <>
+                          <div><span className="text-gray-400">Category</span><div className="mt-0.5 font-semibold text-black">{submission.business_category}</div></div>
+                          <div className="sm:col-span-2"><span className="text-gray-400">Registration</span><div className="mt-0.5 font-semibold text-black">{submission.business_registration_details}</div></div>
+                        </>
+                      )}
+                    </div>
+
+                    {(submission.business_description || submission.website || submission.additional_notes) && (
+                      <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
+                        {submission.business_description && <p><strong className="text-black">About:</strong> {submission.business_description}</p>}
+                        {submission.website && <p className="mt-1"><strong className="text-black">Website:</strong> {submission.website}</p>}
+                        {submission.additional_notes && <p className="mt-1"><strong className="text-black">Notes:</strong> {submission.additional_notes}</p>}
+                      </div>
+                    )}
+                    {submission.decline_reason && (
+                      <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
+                        <strong>Decline reason:</strong> {submission.decline_reason}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-full flex-shrink-0 lg:w-72">
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        {business ? "Business review checklist" : "Individual review checklist"}
+                      </p>
+                      <div className="space-y-1.5">
+                        {checklist.map(([label, complete]) => (
+                          <div key={label} className="flex items-center gap-2 text-xs text-gray-600">
+                            {complete ? <CheckCircle2 size={13} className="text-emerald-600" /> : <XCircle size={13} className="text-red-500" />}
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {submission.identity_document_url ? (
+                        <a
+                          href={submission.identity_document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:border-black hover:text-black"
+                        >
+                          <Eye size={13} /> View ID
+                        </a>
+                      ) : (
+                        <span className="flex flex-1 items-center justify-center rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">ID unavailable</span>
+                      )}
+                      {submission.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => review(submission, "approved")}
+                            disabled={actionLoading === submission.id}
+                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {actionLoading === submission.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => setDeclineModal(submission)}
+                            className="w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <p className="mt-2 text-[10px] text-gray-400">Submitted {formatDateTime(submission.submitted_at)}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+        </div>
+      )}
+
+      {declineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-black">Decline verification</h3>
+            <p className="mt-1 text-sm text-gray-500">Tell {declineModal.store_name || declineModal.full_name} what must be corrected before resubmitting.</p>
+            <textarea
+              value={declineReason}
+              onChange={(event) => setDeclineReason(event.target.value)}
+              rows={4}
+              className="mt-4 w-full resize-none rounded-xl border border-gray-200 p-3 text-sm text-black outline-none focus:border-black"
+              placeholder="Required reason…"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { setDeclineModal(null); setDeclineReason(""); }} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => review(declineModal, "declined")}
+                disabled={!declineReason.trim() || actionLoading === declineModal.id}
+                className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {actionLoading === declineModal.id && <Loader2 size={14} className="animate-spin" />}
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1127,6 +1321,8 @@ function ActivityLogSection() {
           <option value="unsuspend_user">Unsuspend User</option>
           <option value="soft_delete_user">Delete User</option>
           <option value="restore_user">Restore User</option>
+          <option value="approve_vendor_verification">Approve Vendor Verification</option>
+          <option value="decline_vendor_verification">Decline Vendor Verification</option>
           <option value="update_setting">Update Setting</option>
         </select>
         <select

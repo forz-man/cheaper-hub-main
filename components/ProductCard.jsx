@@ -10,6 +10,7 @@ import useAuth from "@/hooks/useAuth";
 import { requireAuth } from "@/lib/auth-flow";
 import StarRating from "@/components/reviews/StarRating";
 import { supabase } from "@/lib/supabase";
+import VerifiedSellerBadge from "@/components/VerifiedSellerBadge";
 
 const ProductCard = ({ product }) => {
   const { addItem, openCart } = useCart();
@@ -198,10 +199,17 @@ const ProductCard = ({ product }) => {
       </div>
 
       <div className="p-4">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
-            {product.vendor_name || "Verified Seller"}
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <p className="truncate text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+              {product.vendor_name || "Marketplace Seller"}
+            </p>
+            <VerifiedSellerBadge
+              sellerType={product.seller_type}
+              verificationStatus={product.seller_verification_status}
+              compact
+            />
+          </div>
           {product.isPremium && (
             <div className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded-full">
               <TrendingUp size={10} className="text-gray-600" />

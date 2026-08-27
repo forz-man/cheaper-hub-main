@@ -17,6 +17,7 @@ import { requireAuth } from "@/lib/auth-flow";
 import { mergeVendorProfile } from "@/lib/vendor-display";
 import StarRating from "@/components/reviews/StarRating";
 import ReviewCard from "@/components/reviews/ReviewCard";
+import VerifiedSellerBadge from "@/components/VerifiedSellerBadge";
 
 function normalizeProduct(raw) {
   if (!raw) return null;
@@ -40,6 +41,8 @@ function normalizeProduct(raw) {
     seller_phone: raw.seller_phone || raw.sellerPhone || "",
     seller_location: raw.seller_location || raw.sellerLocation || "",
     seller_verified: raw.seller_verified ?? raw.sellerVerified ?? false,
+    seller_type: raw.seller_type || raw.sellerType || null,
+    seller_verification_status: raw.seller_verification_status || raw.verification_status || "not_submitted",
     seller_join_date: raw.seller_join_date || raw.sellerJoinDate || "",
     seller_total_products: raw.seller_total_products || raw.sellerTotalProducts || 0,
     seller_response_time: raw.seller_response_time || raw.sellerResponseTime || "",
@@ -264,7 +267,7 @@ export default function ProductPage({ params }) {
         const { data: vendorProfile } = data.vendor_id
           ? await supabase
               .from("profiles")
-              .select("id, store_name, full_name, email, phone_number, phone, location, bio, avatar_url")
+              .select("*")
               .eq("id", data.vendor_id)
               .maybeSingle()
           : { data: null };
@@ -790,11 +793,11 @@ export default function ProductPage({ params }) {
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="font-semibold text-sm text-[#111]">{product.vendor_name}</div>
-                      {product.seller_verified && (
-                        <div className="flex items-center gap-0.5 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full text-[8px] font-semibold">
-                          <Check size={8} /> Verified
-                        </div>
-                      )}
+                      <VerifiedSellerBadge
+                        sellerType={product.seller_type}
+                        verificationStatus={product.seller_verification_status}
+                        compact
+                      />
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
                       <Star size={11} className="text-amber-500 fill-amber-500" />

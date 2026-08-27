@@ -5,3 +5,4 @@
 - [External Supabase schema changes](external-supabase-schema-changes.md) — agent has no DB password for the user's external Supabase, so table/column DDL must be handed to the user as SQL to run themselves, not applied programmatically.
 - [Public npm lockfiles](public-npm-lockfiles.md) — shared deployments need a public-registry lockfile, never Replit firewall tarball URLs.
 - [Integration security boundaries](integration-security-boundaries.md) — privileged roles are DB-authoritative; external API requests pin public IPs and reject cross-origin redirects.
+- [Verification review integrity](verification-review-integrity.md) — pending submissions are immutable; admin decisions must match the exact reviewed revision under a DB row lock.

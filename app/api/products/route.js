@@ -1,8 +1,6 @@
 import { createClient } from "@/lib/server";
 import { NextResponse } from "next/server";
-
-
-
+import { mergeVendorProfiles } from "@/lib/vendor-display";
 export async function GET(request) {
   try {
     const supabase = await createClient();
@@ -30,7 +28,15 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json(data, { status: 200 });
+    const vendorIds = [...new Set((data || []).map((product) => product.vendor_id).filter(Boolean))];
+    const { data: profiles } = vendorIds.length
+      ? await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", vendorIds)
+      : { data: [] };
+
+    return NextResponse.json(mergeVendorProfiles(data || [], profiles || []), { status: 200 });
   } catch (error) {
     return NextResponse.json(
       {
