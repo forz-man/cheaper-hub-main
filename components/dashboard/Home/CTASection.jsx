@@ -24,7 +24,7 @@ const CTASection = () => {
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link 
-                href="/register?role=buyer" 
+                href="/marketplace"
                 className="inline-flex items-center justify-center bg-black text-white px-9 py-4 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-all duration-300 hover:shadow-xl hover:shadow-black/20"
               >
                 Start shopping

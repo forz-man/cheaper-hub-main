@@ -158,7 +158,7 @@ const HeroSection = () => {
             >
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link 
-                  href="/register?role=buyer" 
+                  href="/marketplace"
                   className="group flex items-center justify-center gap-2 bg-[#4D8337] text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-[#3E6D2E] transition-all duration-300 hover:shadow-xl hover:shadow-[#84BA64]/30"
                 >
                   <Package size={16} />

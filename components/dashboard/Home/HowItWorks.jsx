@@ -71,7 +71,7 @@ const HowItWorks = () => {
               ))}
             </div>
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <Link href="/register?role=buyer" className="inline-flex items-center gap-2 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
+              <Link href="/marketplace" className="inline-flex items-center gap-2 text-sm font-semibold text-black hover:text-gray-600 transition-colors">
                 Shop now <ArrowRight size={14} />
               </Link>
             </div>
