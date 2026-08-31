@@ -6,3 +6,4 @@
 - [Public npm lockfiles](public-npm-lockfiles.md) — shared deployments need a public-registry lockfile, never Replit firewall tarball URLs.
 - [Integration security boundaries](integration-security-boundaries.md) — privileged roles are DB-authoritative; external API requests pin public IPs and reject cross-origin redirects.
 - [Verification review integrity](verification-review-integrity.md) — pending submissions are immutable; admin decisions must match the exact reviewed revision under a DB row lock.
+- [Auth email redirect integrity](auth-email-redirect-integrity.md) — emailed auth callbacks use configured canonical HTTPS origins, never request host headers; provider acceptance is not delivery.

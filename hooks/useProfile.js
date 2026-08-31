@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import useAuth from "@/hooks/useAuth";
 
 export default function useProfile() {
@@ -19,58 +18,13 @@ export default function useProfile() {
 
     async function loadProfile() {
       try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          // If profile row doesn't exist, insert a real profile record into the database
-          if (error.code === "PGRST116" || error.message?.includes("no rows") || error.message?.includes("JSON object")) {
-            console.log("Profile not found in DB, creating real profile row for user:", user.id);
-            
-            const email = user.email || "";
-            const username = email ? email.split("@")[0] : "user";
-            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || username || "User";
-            const role = user.user_metadata?.role || user.app_metadata?.role || "buyer";
-            const currentMonthYear = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-            const newProfileData = {
-              id: user.id,
-              email: email,
-              full_name: fullName,
-              username: username,
-              role: role,
-              store_name: `${fullName}'s Store`,
-              phone: user.phone || "",
-              website: "",
-              location: "",
-              member_since: currentMonthYear,
-              bio: "Preferred seller on Cheaper Hub marketplace.",
-              badges: ["Email verified"],
-              listings_count: 0,
-              inventory_count: 0,
-              deals_count: 0,
-              revenue: 0.00
-            };
-
-            const { data: insertedData, error: insertError } = await supabase
-              .from("profiles")
-              .insert(newProfileData)
-              .select()
-              .single();
-
-            if (insertError) throw insertError;
-            setProfile(insertedData || newProfileData);
-            return;
-          }
-          throw error;
-        }
-
-        setProfile(data);
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load your profile.");
+        setProfile(payload.profile);
+        setError(null);
       } catch (err) {
-        console.warn("Error loading real profile from Supabase:", err);
+        console.warn("Error loading profile from Supabase:", err);
         setError(err);
       } finally {
         setLoading(false);
@@ -78,21 +32,21 @@ export default function useProfile() {
     }
 
     loadProfile();
-  }, [user, authLoading]);
+  }, [user?.id, user?.email, authLoading]);
 
   const updateProfile = async (updates) => {
     if (!profile || !user) return { error: "No profile or user loaded" };
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", user.id)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      setProfile(data);
-      return { data, error: null };
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not update your profile.");
+      setProfile(payload.profile);
+      window.dispatchEvent(new CustomEvent("profile-updated", { detail: payload.profile }));
+      return { data: payload.profile, error: null };
     } catch (err) {
       console.warn("Error updating profile in Supabase:", err);
       return { error: err };

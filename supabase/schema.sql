@@ -637,6 +637,8 @@ alter table public.profiles add column if not exists updated_at timestamptz defa
 alter table public.profiles add column if not exists seller_type text;
 alter table public.profiles add column if not exists verification_status text not null default 'not_submitted';
 alter table public.profiles add column if not exists verified_at timestamptz;
+alter table public.profiles add column if not exists email_notifications boolean not null default true;
+alter table public.profiles add column if not exists sms_notifications boolean not null default false;
 
 do $$
 begin

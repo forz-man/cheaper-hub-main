@@ -2,13 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { sendPasswordChangedEmail } from "@/lib/emails/password-changed";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+import { hasPasswordIdentity, validatePasswordChangeInput } from "@/lib/account-settings.mjs";
 
 export async function POST(request) {
-  const { password } = await request.json();
-
-  if (!password || typeof password !== "string" || password.length < 6) {
-    return NextResponse.json({ error: "Invalid password." }, { status: 400 });
-  }
+  const { currentPassword, password } = await request.json();
 
   const cookieStore = await cookies();
 
@@ -37,13 +35,35 @@ export async function POST(request) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
+  if (!hasPasswordIdentity(user)) {
+    return NextResponse.json(
+      {
+        error: "This account signs in with Google. Use the password setup link instead.",
+        code: "OAUTH_ONLY",
+      },
+      { status: 409 }
+    );
+  }
+
+  const validationError = validatePasswordChangeInput({ currentPassword, password });
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const { error: reauthError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (reauthError) {
+    return NextResponse.json({ error: "Current password is incorrect." }, { status: 403 });
+  }
+
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Fire the security notification email — non-blocking, never fails the request.
   const changedAt = new Date().toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -55,9 +75,46 @@ export async function POST(request) {
       : "");
   const resetPasswordUrl = `${origin}/reset-password`;
 
-  sendPasswordChangedEmail({ email: user.email, changedAt, resetPasswordUrl }).catch(
-    (err) => console.error("[update-password] Failed to send email:", err.message)
-  );
+  let notificationStored = false;
+  let emailAccepted = false;
+  try {
+    const { error: notificationError } = await createAdminClient()
+      .from("notifications")
+      .insert({
+        user_id: user.id,
+        type: "system",
+        title: "Password changed",
+        body: `Your account password was changed on ${changedAt}.`,
+        link: "/settings?section=security",
+        data: { event: "password_changed" },
+        is_read: false,
+      });
+    if (notificationError) throw notificationError;
+    notificationStored = true;
+  } catch (notificationError) {
+    console.error("[update-password] Failed to store notification:", notificationError.message);
+  }
 
-  return NextResponse.json({ success: true });
+  try {
+    const emailResult = await sendPasswordChangedEmail({
+      email: user.email,
+      changedAt,
+      resetPasswordUrl,
+    });
+    if (emailResult?.error) throw new Error(emailResult.error.message);
+    emailAccepted = true;
+  } catch (emailError) {
+    console.error("[update-password] Failed to send email:", emailError.message);
+  }
+
+  return NextResponse.json({
+    success: true,
+    notificationStored,
+    emailAccepted,
+    warning: !emailAccepted
+      ? "Your password changed, but the security email could not be queued."
+      : !notificationStored
+        ? "Your password changed, but the in-app notification could not be stored."
+        : null,
+  });
 }

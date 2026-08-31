@@ -150,6 +150,20 @@ export async function GET(request) {
     }
   }
 
+  if (user.email_confirmed_at && user.email) {
+    try {
+      const { error: emailSyncError } = await createAdminClient()
+        .from("profiles")
+        .update({ email: user.email, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+      if (emailSyncError) {
+        console.warn("[auth/callback] Profile email sync failed:", emailSyncError.message);
+      }
+    } catch (syncError) {
+      console.warn("[auth/callback] Profile email sync failed:", syncError.message);
+    }
+  }
+
   const defaultDestination = role === "vendor" && isSignup
     ? "/vendor/profile?verify=1"
     : destinationForRole(role);

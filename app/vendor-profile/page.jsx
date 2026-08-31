@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   User, Store, Mail, Phone, Globe, MapPin, Calendar, 
   Award, ShieldCheck, PhoneCall, ListCollapse, BarChart3, 
-  Settings as SettingsIcon, Activity as ActivityIcon, Edit3, Save, X,
+  Activity as ActivityIcon, Edit3, Save, X,
   FileText, Camera, Upload
 } from "lucide-react";
 import { getUserInitial } from "@/lib/utils";
@@ -149,6 +149,10 @@ export default function VendorProfilePage() {
   }, []);
 
   const handleTabChange = (tab) => {
+    if (tab === "Settings") {
+      router.push("/settings");
+      return;
+    }
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -247,17 +251,9 @@ export default function VendorProfilePage() {
         updated_at: new Date().toISOString()
       };
 
-      const { data, error: saveErr } = await supabase
-        .from('profiles')
-        .update(cleanPayload)
-        .eq('id', user.id)
-        .select()
-        .single();
-
-      if (saveErr) {
-        console.error("Save failed:", saveErr);
-        throw saveErr;
-      }
+      const result = await updateProfile(cleanPayload);
+      if (result?.error) throw result.error;
+      const data = result.data;
 
       // Merge new data with existing profile state so we preserve badges, listings_count, etc. in UI
       setProfile({
@@ -559,14 +555,6 @@ export default function VendorProfilePage() {
             <ActivityIcon size={32} className="text-gray-300 mx-auto mb-2" />
             <p className="text-sm font-semibold text-black">No recent vendor activity</p>
             <p className="text-xs text-gray-400 mt-1">Actions taken on listings and deals will display here.</p>
-          </div>
-        )}
-
-        {activeTab === "Settings" && (
-          <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-8 shadow-sm text-center py-16">
-            <SettingsIcon size={32} className="text-gray-300 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-black">Settings dashboard is locked</p>
-            <p className="text-xs text-gray-400 mt-1">Configure payouts and platform preferences in settings tab.</p>
           </div>
         )}
 

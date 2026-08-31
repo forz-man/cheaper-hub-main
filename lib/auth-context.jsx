@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { isVerifiedRecoveryEvent } from "./account-settings.mjs";
 
 const AuthContext = createContext(null);
 
@@ -36,6 +37,7 @@ function clearIdle() {
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recoverySession, setRecoverySession] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -90,9 +92,11 @@ export function AuthProvider({ children }) {
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         console.log("[AuthProvider] onAuthStateChange:", event, session?.user?.email || "no session");
         if (session?.user) {
+          if (isVerifiedRecoveryEvent(event, session)) setRecoverySession(true);
           checkAndUpdateIdle();
           setUser(session.user);
         } else {
+          setRecoverySession(false);
           clearIdle();
           setUser(null);
         }
@@ -116,7 +120,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, recoverySession }}>
       {children}
     </AuthContext.Provider>
   );
