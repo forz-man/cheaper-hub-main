@@ -78,7 +78,7 @@ export default function BuyerProfilePage() {
         .maybeSingle();
       const role = resolveUserRole(user, profileRow?.role);
       if (!cancelled && role !== "buyer") {
-        router.replace(role === "vendor" ? "/vendor-profile" : "/dashboard");
+      router.replace(role === "vendor" ? "/vendor/profile" : "/dashboard");
       }
     }
 

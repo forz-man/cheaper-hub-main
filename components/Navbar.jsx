@@ -89,7 +89,7 @@ export default function Navbar() {
   const userRole = resolveUserRole(user, profileRole);
   const profileHref =
     userRole === "vendor"
-      ? "/vendor-profile"
+      ? "/vendor/profile"
       : userRole === "buyer"
         ? "/buyer-profile"
         : "/dashboard";
@@ -101,7 +101,7 @@ export default function Navbar() {
         : "Profile";
   const isProtectedPath = !!(
     pathname?.startsWith("/dashboard") ||
-    pathname === "/vendor-profile" ||
+    pathname === "/vendor/profile" ||
     pathname === "/buyer-profile" ||
     pathname === "/messages" ||
     pathname === "/notifications"
